@@ -25,9 +25,9 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 
-	_ "net/http/pprof"
 	"path/filepath"
 	"sync"
+	_ "net/http/pprof"
 )
 
 const (
@@ -44,7 +44,7 @@ const (
 	scoreConditionLevelInfo     = 3
 	scoreConditionLevelWarning  = 2
 	scoreConditionLevelCritical = 1
-	iconFileDir                 = "../icons"
+	iconFileDir = "../icons"
 )
 
 var (
@@ -199,6 +199,8 @@ func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
 	return sqlx.Open("mysql", dsn)
 }
 
+
+
 func init() {
 	sessionStore = sessions.NewCookieStore([]byte(getEnv("SESSION_KEY", "isucondition")))
 
@@ -214,38 +216,36 @@ func init() {
 
 // Global変数を定義
 type latestConditionCacheEntry struct {
-	IsuID     int
+	IsuID int
 	Character string
 	Timestamp time.Time
-	Level     string
+	Level string
 }
 
 type LatestConditionCache struct {
 	mu sync.RWMutex
-	m  map[string]latestConditionCacheEntry
+	m map[string]latestConditionCacheEntry
 }
 
 var latestConditionCache = LatestConditionCache{
 	m: make(map[string]latestConditionCacheEntry),
 }
-
 // jia_isu_uuid -> condition_levelのようなことを api/trendのためにしたかった.
 
 var isuMeta struct {
-	ID        int    `db:"id"`
+	ID int `db:"id"`
 	Character string `db:"character"`
 }
 
 type isuMetaCacheEntry struct {
-	IsuID     int
+	IsuID int
 	Character string
 }
-
 // jia_isu_uuid -> isu_meta 更新中なのか否かの管理が必要らしい, 大変...
 
 type IsuMetaCache struct {
 	mu sync.RWMutex
-	m  map[string]isuMetaCacheEntry
+	m map[string]isuMetaCacheEntry
 }
 
 var isuMetaCache = IsuMetaCache{
@@ -261,7 +261,7 @@ func rebuildIsuMetaCache() error {
 	next := make(map[string]isuMetaCacheEntry, len(isuList))
 	for _, isu := range isuList {
 		next[isu.JIAIsuUUID] = isuMetaCacheEntry{
-			IsuID:     isu.ID,
+			IsuID: isu.ID,
 			Character: isu.Character,
 		}
 	}
@@ -282,33 +282,33 @@ func rebuildLatestConditionCache() error {
 
 	rows := []LatestConditionRow{}
 	err := db.Select(&rows,
-		"SELECT ic.jia_isu_uuid, ic.timestamp, ic.level "+
-			"from isu_condition ic "+
-			"INNER JOIN ("+
-			"  SELECT `jia_isu_uuid`, MAX(`timestamp`) AS `timestamp` "+
-			"  FROM `isu_condition` "+
-			"  GROUP BY `jia_isu_uuid`"+
-			") latest "+
-			"ON ic.`jia_isu_uuid` = latest.`jia_isu_uuid` "+
-			"AND ic.`timestamp` = latest.`timestamp`",
+		"SELECT ic.jia_isu_uuid, ic.timestamp, ic.level " +
+		"from isu_condition ic "+
+		"INNER JOIN (" +
+		 "  SELECT `jia_isu_uuid`, MAX(`timestamp`) AS `timestamp` "+
+		"  FROM `isu_condition` "+
+		"  GROUP BY `jia_isu_uuid`"+
+		") latest "+
+		"ON ic.`jia_isu_uuid` = latest.`jia_isu_uuid` "+
+		"AND ic.`timestamp` = latest.`timestamp`",
 	)
 	if err != nil {
 		return err
 	}
 
-	next := make(map[string]latestConditionCacheEntry, len(rows))
-	for _, row := range rows {
-		next[row.JIAIsuUUID] = latestConditionCacheEntry{
-			Timestamp: row.Timestamp,
-			Level:     row.Level,
-		}
-	}
+  	next := make(map[string]latestConditionCacheEntry, len(rows))
+  	for _, row := range rows {
+  		next[row.JIAIsuUUID] = latestConditionCacheEntry{
+  			Timestamp: row.Timestamp,
+  			Level:     row.Level,
+  		}
+  	}
 
-	latestConditionCache.mu.Lock()
-	latestConditionCache.m = next
-	latestConditionCache.mu.Unlock()
+  	latestConditionCache.mu.Lock()
+  	latestConditionCache.m = next
+  	latestConditionCache.mu.Unlock()
 
-	return nil
+  	return nil
 }
 
 func main() {
@@ -342,6 +342,8 @@ func main() {
 	e.GET("/register", getIndex)
 	e.Static("/assets", frontendContentsPath+"/assets")
 
+
+
 	mySQLConnectionData = NewMySQLConnectionEnv()
 
 	var err error
@@ -361,7 +363,7 @@ func main() {
 
 	// pprof用のサーバーを追加
 	go func() {
-		e.Logger.Fatal(http.ListenAndServe("0.0.0.0:6060", nil))
+        	e.Logger.Fatal(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
@@ -370,13 +372,14 @@ func main() {
 
 func getSession(r *http.Request) (*sessions.Session, error) {
 	session, err := sessionStore.Get(r, sessionName) // sessionName(const) = isuconditionGo, Cookieのことですか？
-	// なんか echoの機能があるみたく, NewCookieStore()みたいなのをinitで呼んでる.
+	// なんか echoの機能があるみたく, NewCookieStore()みたいなのをinitで呼んでる. 
 	// 多分このsessionStoreからのkeyでの取り出し自体が, gorilla/sesionによる KEYでの検証を隠蔽してるので、このデータが多分信頼できる
 	if err != nil {
 		return nil, err
 	}
 	return session, nil
 }
+
 
 // TODO: jwtの中にuser_idを持たせたほうが良さそう. 毎回DB引いてやがる
 // TO CHECK: jwtのverify結果のcachingをしてみる?? (メモリーにかなり余裕あるし)
@@ -420,6 +423,7 @@ func getJIAServiceURL(tx *sqlx.Tx) string {
 	return config.URL
 }
 
+
 // ファイル書き出しのhelper
 func saveIsuIconToFile(jiaIsuUUID string, image []byte) error {
 	if err := os.MkdirAll(iconFileDir, 0755); err != nil {
@@ -430,6 +434,8 @@ func saveIsuIconToFile(jiaIsuUUID string, image []byte) error {
 	return ioutil.WriteFile(iconPath, image, 0644)
 }
 
+
+
 // init後にimageをfileに書き出す
 func exportIsuIconsToFile() error {
 	rows, err := db.Queryx("SELECT jia_isu_uuid, image FROM isu")
@@ -438,10 +444,10 @@ func exportIsuIconsToFile() error {
 	}
 	defer rows.Close()
 
-	for rows.Next() {
+        for rows.Next() {
 		var isu struct {
 			JIAIsuUUID string `db:"jia_isu_uuid"`
-			Image      []byte `db:"image"`
+			Image []byte `db:"image"`
 		}
 		if err := rows.StructScan(&isu); err != nil {
 			return err
@@ -453,6 +459,7 @@ func exportIsuIconsToFile() error {
 
 	return rows.Err()
 }
+
 
 // 環境を初期化するため,書き出されたiconを消す
 func resetIsuIconFiles() error {
@@ -480,6 +487,7 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+
 	// in-memoryのcacheデータの再構築
 	if err := rebuildIsuMetaCache(); err != nil {
 		c.Logger().Errorf("faile to rebuild isu meta cache: %v", err)
@@ -490,17 +498,17 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// このinit処理は20秒の猶予があるらしい,
+	// このinit処理は20秒の猶予があるらしい, 
 	// ファイル書き出し処理をしても余裕で間に合うだろう
 
 	if err := resetIsuIconFiles(); err != nil {
 		c.Logger().Errorf("failed to reset isu icons: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+		return c.NoContent(http.StatusInternalServerError);
 	}
 
 	if err := exportIsuIconsToFile(); err != nil {
 		c.Logger().Errorf("faile to export isu icons: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+		return c.NoContent(http.StatusInternalServerError);
 	}
 
 	_, err = db.Exec(
@@ -759,7 +767,7 @@ func postIsu(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec("INSERT INTO `isu`"+
+	_, err = tx.Exec("INSERT INTO `isu`"+
 		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
 		jiaIsuUUID, isuName, image, jiaUserID)
 	if err != nil {
@@ -772,16 +780,12 @@ func postIsu(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	isuID, err := result.LastInsertId()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
 	// DB登録時にfile書き込みもする
 	if err := saveIsuIconToFile(jiaIsuUUID, image); err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+
 
 	targetURL := getJIAServiceURL(tx) + "/api/activate"
 	body := JIAServiceRequest{postIsuConditionTargetBaseURL, jiaIsuUUID}
@@ -791,7 +795,7 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// TODO: 今気づいたけど、これなんか怪しいな, NewRequestって,
+	// TODO: 今気づいたけど、これなんか怪しいな, NewRequestって, 
 	// syntax知らんけども, ちゃんとソケット再活用してるんか？
 	reqJIA, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewBuffer(bodyJSON))
 	if err != nil {
@@ -831,12 +835,14 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	isu := Isu{
-		ID:         int(isuID),
-		JIAIsuUUID: jiaIsuUUID,
-		Name:       isuName,
-		Character:  isuFromJIA.Character,
-		JIAUserID:  jiaUserID,
+	var isu Isu
+	err = tx.Get(
+		&isu,
+		"SELECT * FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+		jiaUserID, jiaIsuUUID)
+	if err != nil {
+		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	err = tx.Commit()
@@ -845,11 +851,12 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+
 	// ここでキャッシュ更新をするお
 	isuMetaCache.mu.Lock()
 	isuMetaCache.m[jiaIsuUUID] = isuMetaCacheEntry{
-		IsuID:     isu.ID,
-		Character: isu.Character,
+		IsuID: isu.ID,
+		Character : isu.Character,
 	}
 	isuMetaCache.mu.Unlock()
 
@@ -923,9 +930,10 @@ func getIsuIcon(c echo.Context) error {
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
+
 	// iconPath := filepath(iconFileDir, jiaIsuUUID+".jpg")
 	// return c.File(iconPath) あんまり早くならんかも
-	//	return c.Blob(http.StatusOK, "", image)
+//	return c.Blob(http.StatusOK, "", image)
 
 	// nginxにredirectする
 	iconPath := "/internal-icons/" + jiaIsuUUID + ".jpg"
@@ -1004,13 +1012,14 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 	var startTimeInThisHour time.Time
 	var condition IsuCondition
 
+
 	// 日時指定をかけ、該当date以外の無駄な処理を省く
 	startTime := graphDate
 	endTime := graphDate.Add(time.Hour * 24)
 	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? "+
-		"AND timestamp >= ? "+
-		"AND timestamp < ? "+
-		"ORDER BY `timestamp` ASC", jiaIsuUUID, startTime, endTime)
+	"AND timestamp >= ? "+
+	"AND timestamp < ? "+
+	"ORDER BY `timestamp` ASC", jiaIsuUUID, startTime, endTime)
 	if err != nil {
 		return nil, fmt.Errorf("db error: %v", err)
 	}
@@ -1252,18 +1261,18 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 
 	if startTime.IsZero() {
 		// いったん * -> 必要なデータをやってみる
-		query, params, err = sqlx.In(
+		query,params, err = sqlx.In(
 			"SELECT `jia_isu_uuid`,`timestamp`,`is_sitting`,`condition`,`level`,"+
-				"`message` FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
+			"`message` FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"       AND `level` IN (?)"+ // 配列を展開するためにsqlx.Inを使っているらしい
 				"	ORDER BY `timestamp` DESC LIMIT ?",
 			jiaIsuUUID, endTime, conditionLevelArray, limit,
 		)
 	} else {
-		query, params, err = sqlx.In(
+		query,params,err = sqlx.In(
 			"SELECT `jia_isu_uuid`,`timestamp`,`is_sitting`,`condition`,`level`,"+
-				"`message`  FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
+                        "`message`  FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"	AND ? <= `timestamp`"+
 				"       AND `level` IN (?)"+ // 配列を展開するためにsqlx.Inを使っているらしい
@@ -1286,29 +1295,29 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 
 	conditionsResponse := []*GetIsuConditionResponse{}
 	for _, c := range conditions {
-		// 		cLevel, err := calculateConditionLevel(c.Condition)
-		//		if err != nil {
-		//			continue}
+// 		cLevel, err := calculateConditionLevel(c.Condition)
+//		if err != nil {
+//			continue}
 
 		//----------- DEBUG--------
-		//		if cLevel != c.Level {
-		//		fmt.Printf("data inconsistency: condition=%s level=%s cLevel=%s\n",
-		//   c.Condition, c.Level, cLevel)
-		//fmt.Printf("fucking data inconsistency, %s, %s\n", c.Condition, c.Level)
-		//		}
+//		if cLevel != c.Level {
+//		fmt.Printf("data inconsistency: condition=%s level=%s cLevel=%s\n",
+ //   c.Condition, c.Level, cLevel)
+			//fmt.Printf("fucking data inconsistency, %s, %s\n", c.Condition, c.Level)
+//		}
 
-		data := GetIsuConditionResponse{
-			JIAIsuUUID: c.JIAIsuUUID,
-			IsuName:    isuName,
-			Timestamp:  c.Timestamp.Unix(),
-			IsSitting:  c.IsSitting,
-			Condition:  c.Condition,
-			//ConditionLevel: cLevel,
-			ConditionLevel: c.Level,
-			Message:        c.Message,
-		}
+		data := GetIsuConditionResponse {
+				JIAIsuUUID:     c.JIAIsuUUID,
+				IsuName:        isuName,
+				Timestamp:      c.Timestamp.Unix(),
+				IsSitting:      c.IsSitting,
+				Condition:      c.Condition,
+				//ConditionLevel: cLevel,
+				ConditionLevel: c.Level,
+				Message:        c.Message,
+            	}
 
-		//if len(conditionsResponse) > limit {
+	//if len(conditionsResponse) > limit {
 		conditionsResponse = append(conditionsResponse, &data) // 最初からその件数になっている.
 	}
 
@@ -1338,17 +1347,17 @@ func calculateConditionLevel(condition string) (string, error) {
 // ISUの性格毎の最新のコンディション情報
 func getTrend(c echo.Context) error {
 	// 一度に全部のisuを取得してしまう, N+1の簡単な解消
-	//	allIsuList := []Isu{}
-	//	err := db.Select(&allIsuList, "SELECT id, `character`, jia_isu_uuid from isu")
-	//	if err != nil {
-	//		c.Logger().Errorf("db error: %v", err)
-	//		return c.NoContent(http.StatusInternalServerError)
-	//	}
+//	allIsuList := []Isu{}
+//	err := db.Select(&allIsuList, "SELECT id, `character`, jia_isu_uuid from isu")
+//	if err != nil {
+//		c.Logger().Errorf("db error: %v", err)
+//		return c.NoContent(http.StatusInternalServerError)
+//	}
 
-	// せっかく作ったキャッシュから取得する
-	isuMetaCache.mu.RLock()
-	allIsuList := make([]Isu, 0, len(isuMetaCache.m))
-	for jiaIsuUUID, meta := range isuMetaCache.m {
+       // せっかく作ったキャッシュから取得する
+	  isuMetaCache.mu.RLock()
+	  allIsuList := make([]Isu, 0, len(isuMetaCache.m))
+	  for jiaIsuUUID, meta := range isuMetaCache.m {
 		allIsuList = append(allIsuList, Isu{
 			ID:         meta.IsuID,
 			JIAIsuUUID: jiaIsuUUID,
@@ -1362,27 +1371,28 @@ func getTrend(c echo.Context) error {
 		characterToIsuList[isu.Character] = append(characterToIsuList[isu.Character], isu)
 	}
 
+
 	res := []TrendResponse{}
 
-	// lockかけずに読むと, 別のthread? go routine? が書き込んで、panicになってアプリが落ちる⚠️
-	latestConditionCache.mu.RLock()
-	latestSnapshot := make(map[string]latestConditionCacheEntry, len(latestConditionCache.m))
+        // lockかけずに読むと, 別のthread? go routine? が書き込んで、panicになってアプリが落ちる⚠️
+        latestConditionCache.mu.RLock()
+        latestSnapshot := make(map[string]latestConditionCacheEntry, len(latestConditionCache.m))
 	for k, v := range latestConditionCache.m {
-		latestSnapshot[k] = v
-	}
+                latestSnapshot[k] = v
+        }
 	latestConditionCache.mu.RUnlock()
 
 	for character, isuList := range characterToIsuList {
 		//isuList := []Isu{}
 		//err = db.Select(&isuList,
-		// "SELECT * FROM `isu` WHERE `character` = ?",
+			// "SELECT * FROM `isu` WHERE `character` = ?",
 		//	"SELECT id, jia_isu_uuid FROM `isu` WHERE `character` = ?",
 		//	character.Character,
-		//	)
-		//	if err != nil {
-		//		c.Logger().Errorf("db error: %v", err)
-		//		return c.NoContent(http.StatusInternalServerError)
-		//	}
+	//	)
+	//	if err != nil {
+	//		c.Logger().Errorf("db error: %v", err)
+	//		return c.NoContent(http.StatusInternalServerError)
+	//	}
 
 		characterInfoIsuConditions := []*TrendCondition{}
 		characterWarningIsuConditions := []*TrendCondition{}
@@ -1420,9 +1430,9 @@ func getTrend(c echo.Context) error {
 			}
 			conditionLevel := latestCondition.Level
 			trendCondition := TrendCondition{
-				ID:        isu.ID,
-				Timestamp: latestCondition.Timestamp.Unix(),
-			}
+                                      ID:        isu.ID,
+                                      Timestamp:  latestCondition.Timestamp.Unix(),
+                              }
 
 			switch conditionLevel {
 			case "info":
@@ -1431,7 +1441,7 @@ func getTrend(c echo.Context) error {
 				characterWarningIsuConditions = append(characterWarningIsuConditions, &trendCondition)
 			case "critical":
 				characterCriticalIsuConditions = append(characterCriticalIsuConditions, &trendCondition)
-				//	}
+			//	}
 			}
 
 		}
@@ -1506,17 +1516,17 @@ func postIsuCondition(c echo.Context) error {
 		}
 
 		// 前計算
-		cLevel, err := calculateConditionLevel(cond.Condition)
-		if err != nil {
-			return c.String(http.StatusBadRequest, "bad request body")
-		}
+                cLevel, err := calculateConditionLevel(cond.Condition)
+                if err != nil {
+                        return c.String(http.StatusBadRequest, "bad request body")
+                }
 		rows = append(rows, IsuCondition{
 			JIAIsuUUID: jiaIsuUUID,
-			Timestamp:  timestamp,
-			IsSitting:  cond.IsSitting,
-			Condition:  cond.Condition,
-			Level:      cLevel, // 冗長的に持たせる
-			Message:    cond.Message,
+			Timestamp: timestamp,
+			IsSitting: cond.IsSitting,
+			Condition: cond.Condition,
+			Level: cLevel, // 冗長的に持たせる
+			Message: cond.Message,
 		})
 	}
 
@@ -1525,7 +1535,7 @@ func postIsuCondition(c echo.Context) error {
 		"INSERT INTO `isu_condition`"+
 			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`,`level`, `message`)"+
 			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :level, :message)",
-		rows)
+			rows)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -1538,7 +1548,7 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// このタイミングで hashMap書き込みをするぞ,
+	// このタイミングで hashMap書き込みをするぞ, 
 	// なおこれがタイムアウトとかになったら終わりだぞ
 	// その保証とかはどうするんやろうね、冪等性とリトライというコンセプトを私は持ち合わせている
 	latestConditionCache.mu.Lock()
@@ -1551,7 +1561,7 @@ func postIsuCondition(c echo.Context) error {
 		current, ok := latestConditionCache.m[condition.JIAIsuUUID]
 		if !ok || current.Timestamp.Before(condition.Timestamp) {
 			latestConditionCache.m[condition.JIAIsuUUID] = latestConditionCacheEntry{
-				IsuID:     isuMeta.ID,
+				IsuID: isuMeta.ID,
 				Character: isuMeta.Character,
 				Timestamp: condition.Timestamp,
 				Level:     condition.Level,

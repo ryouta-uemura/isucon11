@@ -1472,7 +1472,7 @@ func postIsuCondition(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "missing: jia_isu_uuid")
 	}
 
-	req := []PostIsuConditionRequest{}
+	req := []PostIsuConditionRequest{} // 配列でくるのね
 	err := c.Bind(&req)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "bad request body")
@@ -1510,15 +1510,15 @@ func postIsuCondition(c echo.Context) error {
 		})
 	}
 
-	tx, err := db.Beginx()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
+	// tx, err := db.Beginx() DBアクセスも1つのbulk insertだけになったし, txを消す
+	//	if err != nil {
+	//		c.Logger().Errorf("db error: %v", err)
+	//		return c.NoContent(http.StatusInternalServerError)
+	//	}
+	//	defer tx.Rollback()
 
 	// bulk insertする
-	_, err = tx.NamedExec(
+	_, err = db.NamedExec(
 		"INSERT INTO `isu_condition`"+
 			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`,`level`, `message`)"+
 			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :level, :message)",
@@ -1528,8 +1528,8 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	// do we still need this commit for this bulk update??
+	//err = tx.Commit()
 
-	err = tx.Commit()
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)

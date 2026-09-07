@@ -55,6 +55,7 @@ var (
 	jiaJWTSigningKey *ecdsa.PublicKey
 
 	postIsuConditionTargetBaseURL string // JIAへのactivate時に登録する，ISUがconditionを送る先のURL
+	jiaServiceURL                 = defaultJIAServiceURL
 )
 
 type Config struct {
@@ -217,16 +218,98 @@ type latestConditionCacheEntry struct {
 	IsuID     int
 	Character string
 	Timestamp time.Time
+	IsSitting bool
+	Condition string
 	Level     string
+	Message   string
 }
 
 type LatestConditionCache struct {
+	shards [latestConditionCacheShardCount]latestConditionCacheShard
+}
+
+type latestConditionCacheShard struct {
 	mu sync.RWMutex
 	m  map[string]latestConditionCacheEntry
 }
 
-var latestConditionCache = LatestConditionCache{
-	m: make(map[string]latestConditionCacheEntry),
+const latestConditionCacheShardCount = 64
+
+var latestConditionCache = newLatestConditionCache()
+
+func newLatestConditionCache() LatestConditionCache {
+	c := LatestConditionCache{}
+	for i := range c.shards {
+		c.shards[i].m = make(map[string]latestConditionCacheEntry)
+	}
+	return c
+}
+
+func (c *LatestConditionCache) shard(key string) *latestConditionCacheShard {
+	var h uint32
+	for i := 0; i < len(key); i++ {
+		h = h*33 + uint32(key[i])
+	}
+	return &c.shards[h%latestConditionCacheShardCount]
+}
+
+func (c *LatestConditionCache) Get(key string) (latestConditionCacheEntry, bool) {
+	s := c.shard(key)
+	s.mu.RLock()
+	v, ok := s.m[key]
+	s.mu.RUnlock()
+	return v, ok
+}
+
+func (c *LatestConditionCache) SetIfNewer(key string, entry latestConditionCacheEntry) {
+	s := c.shard(key)
+	s.mu.Lock()
+	current, ok := s.m[key]
+	if !ok || current.Timestamp.Before(entry.Timestamp) {
+		s.m[key] = entry
+	}
+	s.mu.Unlock()
+}
+
+func (c *LatestConditionCache) ReplaceAll(next map[string]latestConditionCacheEntry) {
+	sharded := make([]map[string]latestConditionCacheEntry, latestConditionCacheShardCount)
+	for i := range sharded {
+		sharded[i] = make(map[string]latestConditionCacheEntry)
+	}
+	for k, v := range next {
+		var h uint32
+		for i := 0; i < len(k); i++ {
+			h = h*33 + uint32(k[i])
+		}
+		sharded[h%latestConditionCacheShardCount][k] = v
+	}
+
+	for i := range c.shards {
+		c.shards[i].mu.Lock()
+		c.shards[i].m = sharded[i]
+		c.shards[i].mu.Unlock()
+	}
+}
+
+func (c *LatestConditionCache) Snapshot() map[string]latestConditionCacheEntry {
+	total := 0
+	for i := range c.shards {
+		s := &c.shards[i]
+		s.mu.RLock()
+		total += len(s.m)
+		s.mu.RUnlock()
+	}
+
+	snapshot := make(map[string]latestConditionCacheEntry, total)
+	for i := range c.shards {
+		s := &c.shards[i]
+		s.mu.RLock()
+		for k, v := range s.m {
+			snapshot[k] = v
+		}
+		s.mu.RUnlock()
+	}
+	return snapshot
 }
 
 // jia_isu_uuid -> condition_levelのようなことを api/trendのためにしたかった.
@@ -250,6 +333,19 @@ type IsuMetaCache struct {
 
 var isuMetaCache = IsuMetaCache{
 	m: make(map[string]isuMetaCacheEntry),
+}
+
+var activatingIsuCache = struct {
+	mu sync.RWMutex
+	m  map[string]struct{}
+}{
+	m: make(map[string]struct{}),
+}
+
+func clearActivatingIsuCache() {
+	activatingIsuCache.mu.Lock()
+	activatingIsuCache.m = make(map[string]struct{})
+	activatingIsuCache.mu.Unlock()
 }
 
 func rebuildIsuMetaCache() error {
@@ -277,12 +373,15 @@ func rebuildLatestConditionCache() error {
 	type LatestConditionRow struct {
 		JIAIsuUUID string    `db:"jia_isu_uuid"`
 		Timestamp  time.Time `db:"timestamp"`
+		IsSitting  bool      `db:"is_sitting"`
+		Condition  string    `db:"condition"`
 		Level      string    `db:"level"`
+		Message    string    `db:"message"`
 	}
 
 	rows := []LatestConditionRow{}
 	err := db.Select(&rows,
-		"SELECT ic.jia_isu_uuid, ic.timestamp, ic.level "+
+		"SELECT ic.jia_isu_uuid, ic.timestamp, ic.is_sitting, ic.condition, ic.level, ic.message "+
 			"from isu_condition ic "+
 			"INNER JOIN ("+
 			"  SELECT `jia_isu_uuid`, MAX(`timestamp`) AS `timestamp` "+
@@ -300,13 +399,14 @@ func rebuildLatestConditionCache() error {
 	for _, row := range rows {
 		next[row.JIAIsuUUID] = latestConditionCacheEntry{
 			Timestamp: row.Timestamp,
+			IsSitting: row.IsSitting,
+			Condition: row.Condition,
 			Level:     row.Level,
+			Message:   row.Message,
 		}
 	}
 
-	latestConditionCache.mu.Lock()
-	latestConditionCache.m = next
-	latestConditionCache.mu.Unlock()
+	latestConditionCache.ReplaceAll(next)
 
 	return nil
 }
@@ -365,6 +465,10 @@ func main() {
 	}()
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
+	// 前回のbenchmarkプロセスのCLOSE-WAITが残り続けてしまっていたらしい,詳細未調査
+	e.Server.ReadHeaderTimeout = 2 * time.Second
+	e.Server.WriteTimeout = 3 * time.Second
+	e.Server.IdleTimeout = 5 * time.Second
 	e.Logger.Fatal(e.Start(serverPort))
 }
 
@@ -479,6 +583,9 @@ func postInitialize(c echo.Context) error {
 		c.Logger().Errorf("exec init.sh error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	jiaServiceURL = request.JIAServiceURL
+
+	clearActivatingIsuCache()
 
 	// in-memoryのcacheデータの再構築
 	if err := rebuildIsuMetaCache(); err != nil {
@@ -654,34 +761,16 @@ func getIsuList(c echo.Context) error {
 
 	responseList := []GetIsuListResponse{}
 	for _, isu := range isuList {
-		var lastCondition IsuCondition
-		foundLastCondition := true
-		err = tx.Get(&lastCondition, "SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` DESC LIMIT 1",
-			isu.JIAIsuUUID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				foundLastCondition = false
-			} else {
-				c.Logger().Errorf("db error: %v", err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-		}
-
 		var formattedCondition *GetIsuConditionResponse
-		if foundLastCondition {
-			conditionLevel, err := calculateConditionLevel(lastCondition.Condition)
-			if err != nil {
-				c.Logger().Error(err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-
+		lastCondition, ok := latestConditionCache.Get(isu.JIAIsuUUID)
+		if ok {
 			formattedCondition = &GetIsuConditionResponse{
-				JIAIsuUUID:     lastCondition.JIAIsuUUID,
+				JIAIsuUUID:     isu.JIAIsuUUID,
 				IsuName:        isu.Name,
 				Timestamp:      lastCondition.Timestamp.Unix(),
 				IsSitting:      lastCondition.IsSitting,
 				Condition:      lastCondition.Condition,
-				ConditionLevel: conditionLevel,
+				ConditionLevel: lastCondition.Level,
 				Message:        lastCondition.Message,
 			}
 		}
@@ -752,38 +841,23 @@ func postIsu(c echo.Context) error {
 		}
 	}
 
-	tx, err := db.Beginx()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
-
-	result, err := tx.Exec("INSERT INTO `isu`"+
-		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
-		jiaIsuUUID, isuName, image, jiaUserID)
-	if err != nil {
-		mysqlErr, ok := err.(*mysql.MySQLError)
-
-		if ok && mysqlErr.Number == uint16(mysqlErrNumDuplicateEntry) {
-			return c.String(http.StatusConflict, "duplicated: isu")
-		}
-
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	isuID, err := result.LastInsertId()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	// DB登録時にfile書き込みもする
-	if err := saveIsuIconToFile(jiaIsuUUID, image); err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
+	isuMetaCache.mu.RLock()
+	_, exists := isuMetaCache.m[jiaIsuUUID]
+	isuMetaCache.mu.RUnlock()
+	if exists {
+		return c.String(http.StatusConflict, "duplicated: isu")
 	}
 
-	targetURL := getJIAServiceURL(tx) + "/api/activate"
+	activatingIsuCache.mu.Lock()
+	activatingIsuCache.m[jiaIsuUUID] = struct{}{}
+	activatingIsuCache.mu.Unlock()
+	defer func() {
+		activatingIsuCache.mu.Lock()
+		delete(activatingIsuCache.m, jiaIsuUUID)
+		activatingIsuCache.mu.Unlock()
+	}()
+
+	targetURL := jiaServiceURL + "/api/activate"
 	body := JIAServiceRequest{postIsuConditionTargetBaseURL, jiaIsuUUID}
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {
@@ -825,7 +899,38 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	_, err = tx.Exec("UPDATE `isu` SET `character` = ? WHERE  `jia_isu_uuid` = ?", isuFromJIA.Character, jiaIsuUUID)
+	if err := saveIsuIconToFile(jiaIsuUUID, image); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	var result sql.Result
+	for retry := 0; retry < 3; retry++ {
+		result, err = db.Exec("INSERT INTO `isu`"+
+			"	(`jia_isu_uuid`, `name`, `image`, `character`, `jia_user_id`) VALUES (?, ?, ?, ?, ?)",
+			jiaIsuUUID, isuName, image, isuFromJIA.Character, jiaUserID)
+		if err == nil {
+			break
+		}
+
+		mysqlErr, ok := err.(*mysql.MySQLError)
+		if ok && mysqlErr.Number == uint16(mysqlErrNumDuplicateEntry) {
+			return c.String(http.StatusConflict, "duplicated: isu")
+		}
+		if ok && mysqlErr.Number == 1213 {
+			time.Sleep(time.Duration(retry+1) * 10 * time.Millisecond)
+			continue
+		}
+
+		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	if err != nil {
+		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	isuID, err := result.LastInsertId()
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -837,12 +942,6 @@ func postIsu(c echo.Context) error {
 		Name:       isuName,
 		Character:  isuFromJIA.Character,
 		JIAUserID:  jiaUserID,
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	// ここでキャッシュ更新をするお
@@ -1364,13 +1463,7 @@ func getTrend(c echo.Context) error {
 
 	res := []TrendResponse{}
 
-	// lockかけずに読むと, 別のthread? go routine? が書き込んで、panicになってアプリが落ちる⚠️
-	latestConditionCache.mu.RLock()
-	latestSnapshot := make(map[string]latestConditionCacheEntry, len(latestConditionCache.m))
-	for k, v := range latestConditionCache.m {
-		latestSnapshot[k] = v
-	}
-	latestConditionCache.mu.RUnlock()
+	latestSnapshot := latestConditionCache.Snapshot()
 
 	for character, isuList := range characterToIsuList {
 		//isuList := []Isu{}
@@ -1481,13 +1574,21 @@ func postIsuCondition(c echo.Context) error {
 	}
 
 	isuMetaCache.mu.RLock()
-	_, ok := isuMetaCache.m[jiaIsuUUID]
+	isuMeta, ok := isuMetaCache.m[jiaIsuUUID]
 	isuMetaCache.mu.RUnlock()
 	if !ok {
+		activatingIsuCache.mu.RLock()
+		_, activating := activatingIsuCache.m[jiaIsuUUID]
+		activatingIsuCache.mu.RUnlock()
+		if activating {
+			return c.NoContent(http.StatusAccepted)
+		}
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
 	var rows []IsuCondition
+	var latestCondition IsuCondition
+	hasLatestCondition := false
 	for _, cond := range req {
 		timestamp := time.Unix(cond.Timestamp, 0)
 
@@ -1500,17 +1601,22 @@ func postIsuCondition(c echo.Context) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
-		rows = append(rows, IsuCondition{
+		condition := IsuCondition{
 			JIAIsuUUID: jiaIsuUUID,
 			Timestamp:  timestamp,
 			IsSitting:  cond.IsSitting,
 			Condition:  cond.Condition,
 			Level:      cLevel, // 冗長的に持たせる
 			Message:    cond.Message,
-		})
+		}
+		rows = append(rows, condition)
+		if !hasLatestCondition || latestCondition.Timestamp.Before(condition.Timestamp) {
+			latestCondition = condition
+			hasLatestCondition = true
+		}
 	}
 
-	// tx, err := db.Beginx() DBアクセスも1つのbulk insertだけになったし, txを消す
+	//	tx, err := db.Beginx() //DBアクセスも1つのbulk insertだけになったし, txを消す
 	//	if err != nil {
 	//		c.Logger().Errorf("db error: %v", err)
 	//		return c.NoContent(http.StatusInternalServerError)
@@ -1535,27 +1641,20 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	// このタイミングで hashMap書き込みをするぞ,
-	// なおこれがタイムアウトとかになったら終わりだぞ
-	// その保証とかはどうするんやろうね、冪等性とリトライというコンセプトを私は持ち合わせている
-	latestConditionCache.mu.Lock()
-	for _, condition := range rows {
-		//fmt.Printf("%s: %s \n", condition.JIAIsuUUID, condition.Level)
-		//debug
-
-		// TODO: register latest condition level to hashmap
-		// latestIsuConditionMap[condition.JIAIsuUUID] = condition.Level
-		current, ok := latestConditionCache.m[condition.JIAIsuUUID]
-		if !ok || current.Timestamp.Before(condition.Timestamp) {
-			latestConditionCache.m[condition.JIAIsuUUID] = latestConditionCacheEntry{
-				IsuID:     isuMeta.ID,
+	if hasLatestCondition {
+		latestConditionCache.SetIfNewer(
+			jiaIsuUUID,
+			latestConditionCacheEntry{
+				IsuID:     isuMeta.IsuID,
 				Character: isuMeta.Character,
-				Timestamp: condition.Timestamp,
-				Level:     condition.Level,
-			}
-		}
+				Timestamp: latestCondition.Timestamp,
+				IsSitting: latestCondition.IsSitting,
+				Condition: latestCondition.Condition,
+				Level:     latestCondition.Level,
+				Message:   latestCondition.Message,
+			},
+		)
 	}
-	latestConditionCache.mu.Unlock()
 
 	return c.NoContent(http.StatusAccepted)
 }

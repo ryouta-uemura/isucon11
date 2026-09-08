@@ -193,6 +193,8 @@ func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
 	return sqlx.Open("mysql", dsn)
 }
 
+// global values.
+var jiaURL string
 func init() {
 	sessionStore = sessions.NewCookieStore([]byte(getEnv("SESSION_KEY", "isucondition")))
 
@@ -252,6 +254,18 @@ func main() {
 		e.Logger.Fatalf("missing: POST_ISUCONDITION_TARGET_BASE_URL")
 		return
 	}
+
+
+	// global変数のjiaURLに代入する
+	var config Config
+        err = db.Get(&config, "SELECT * FROM `isu_association_config` WHERE `name` = ?", "jia_service_url")
+	jiaURL = config.URL
+	if err != nil {
+                if !errors.Is(err, sql.ErrNoRows) {
+                        log.Print(err)
+                }
+        }
+	fmt.Printf("DEBUG: %v", jiaURL)
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
@@ -592,7 +606,8 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	targetURL := getJIAServiceURL(tx) + "/api/activate"
+	// 関数の代わりにglobal変数を使う
+	targetURL := jiaURL + "/api/activate"
 	body := JIAServiceRequest{postIsuConditionTargetBaseURL, jiaIsuUUID}
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {

@@ -276,17 +276,19 @@ func getUserIDFromSession(c echo.Context) (string, int, error) {
 	}
 
 	jiaUserID := _jiaUserID.(string)
-	var count int
 
-	err = db.Get(&count, "SELECT COUNT(*) FROM `user` WHERE `jia_user_id` = ?",
-		jiaUserID)
-	if err != nil {
-		return "", http.StatusInternalServerError, fmt.Errorf("db error: %v", err)
-	}
+	// This check is not needed, I believe
+	//var count int
 
-	if count == 0 {
-		return "", http.StatusUnauthorized, fmt.Errorf("not found: user")
-	}
+	//err = db.Get(&count, "SELECT COUNT(*) FROM `user` WHERE `jia_user_id` = ?",
+	//	jiaUserID)
+	//if err != nil {
+	//	return "", http.StatusInternalServerError, fmt.Errorf("db error: %v", err)
+	//}
+
+	//	if count == 0 {
+	//		return "", http.StatusUnauthorized, fmt.Errorf("not found: user")
+	//	}
 
 	return jiaUserID, 0, nil
 }
@@ -712,6 +714,7 @@ func getIsuIcon(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable") // add cache, since the icon image is not updated.
 	return c.Blob(http.StatusOK, "", image)
 }
 
@@ -1103,7 +1106,7 @@ func getTrend(c echo.Context) error {
 		for _, isu := range isuList {
 			conditions := []IsuCondition{}
 			err = db.Select(&conditions,
-				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC",
+				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC LIMIT 1", // Add limit 1 since we need only latest one.
 				isu.JIAIsuUUID,
 			)
 			if err != nil {

@@ -1,0 +1,4 @@
+# temporarily deactivate slow query log
+sudo mysql -e "SET GLOBAL slow_query_log = 'OFF';"
+
+( This logging might significantly lowers the performance)

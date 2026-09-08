@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ---- 設定 (環境に合わせて変更) ----
+NGINX_LOG="/var/log/nginx/access.log"
+MYSQL_LOG="/var/log/mysql/slow.log"
+
+# ---- ログの初期化 (truncate) ----
+echo "==== Truncating logs ===="
+if [ -f "$NGINX_LOG" ]; then
+    sudo truncate -s 0 "$NGINX_LOG"
+    echo "Cleared: $NGINX_LOG"
+fi
+
+if [ -f "$MYSQL_LOG" ]; then
+    sudo truncate -s 0 "$MYSQL_LOG"
+    echo "Cleared: $MYSQL_LOG"
+fi
+
+# ---- サービスの再起動 ----
+#echo "==== Restarting services ===="
+#sudo systemctl restart nginx
+#sudo systemctl restart mysql
+# sudo systemctl restart isu-go.service # アプリケーションの再起動が必要な場合
+
+echo "Done! Ready for benchmark."
+

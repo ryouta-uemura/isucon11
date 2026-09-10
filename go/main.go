@@ -26,6 +26,7 @@ import (
 	"github.com/labstack/gommon/log"
 
 	_ "net/http/pprof"
+	"path/filepath"
 )
 
 const (
@@ -42,6 +43,8 @@ const (
 	scoreConditionLevelInfo     = 3
 	scoreConditionLevelWarning  = 2
 	scoreConditionLevelCritical = 1
+
+	iconFileDir = "../icons"
 )
 
 var (
@@ -196,6 +199,49 @@ func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
 	return sqlx.Open("mysql", dsn)
 }
 
+// icon file exporting from DB
+func saveIsuIconToFile(jiaIsuUUID string, jiaUserID string, image []byte) error {
+	// この処理無駄じゃない？
+	if err := os.MkdirAll(iconFileDir, 0755); err != nil {
+		return err
+	}
+
+	iconPath := filepath.Join(iconFileDir, jiaUserID+"-"+jiaIsuUUID+".jpg")
+	return ioutil.WriteFile(iconPath, image, 0644)
+}
+
+func exportIsuIconsToFile() error {
+	rows, err := db.Queryx("SELECT jia_isu_uuid, image, jia_user_id FROM isu")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var isu struct {
+			JIAIsuUUID string `db:"jia_isu_uuid"`
+			Image      []byte `db:"image"`
+			JIAUserID  string `db:"jia_user_id"`
+		}
+		if err := rows.StructScan(&isu); err != nil {
+			return err
+		}
+		if err := saveIsuIconToFile(isu.JIAIsuUUID, isu.JIAUserID, isu.Image); err != nil {
+			return err
+		}
+	}
+
+	return rows.Err()
+}
+
+// delete writtten files for initialization
+func resetIsuIconFiles() error {
+	if err := os.RemoveAll(iconFileDir); err != nil {
+		return err
+	}
+	return os.MkdirAll(iconFileDir, 0755)
+}
+
 // global values.
 var jiaURL string
 
@@ -342,6 +388,17 @@ func postInitialize(c echo.Context) error {
 	err = cmd.Run()
 	if err != nil {
 		c.Logger().Errorf("exec init.sh error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	// reset icons
+	if err := resetIsuIconFiles(); err != nil {
+		fmt.Printf("failed to export isu icons: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	// export icons
+	if err := exportIsuIconsToFile(); err != nil {
+		fmt.Printf("failed to export isu icons: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -594,6 +651,12 @@ func postIsu(c echo.Context) error {
 		}
 	}
 
+	// 失敗したら、そのファイル使われなくなるだろうし、この位置で書き込んじゃっていいかなぁ
+	if saveIsuIconToFile(jiaIsuUUID, jiaUserID, image); err != nil {
+		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
 	tx, err := db.Beginx()
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
@@ -726,20 +789,34 @@ func getIsuIcon(c echo.Context) error {
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
-	var image []byte
-	err = db.Get(&image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-		jiaUserID, jiaIsuUUID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.String(http.StatusNotFound, "not found: isu")
-		}
+	// この問い合わせは不要になるだろう, Isuの所有者が1人であれば
+	// ファイル名に書き込んでおく?
+	// このチェック自体は入れておかないと, 整合性チェックに落ちる
+	//var image []byte
+	//	err = db.Get(&exists, "SELECT EXISTS(SELECT 1  FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?)",
+	//		jiaUserID, jiaIsuUUID)
+	//	if err != nil {
+	//		if errors.Is(err, sql.ErrNoRows) {
+	//			return c.String(http.StatusNotFound, "not found: isu")
+	//		}
+	//
+	//		c.Logger().Errorf("db error: %v", err)
+	//		return c.NoContent(http.StatusInternalServerError)
+	//	}
 
-		c.Logger().Errorf("db error: %v", err)
+	filename := jiaUserID + "-" + jiaIsuUUID + ".jpg"
+	iconPath := "/internal-icons/" + filename
+	filePath := filepath.Join(iconFileDir, filename)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return c.String(http.StatusNotFound, "not found: isu")
+	} else if err != nil {
+		c.Logger().Errorf("stat error: $v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	c.Response().Header().Set("X-Accel-Redirect", iconPath)                           // return from nginx
 	c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable") // add cache, since the icon image is not updated.
-	return c.Blob(http.StatusOK, "", image)
+	return c.NoContent(http.StatusOK)
 }
 
 // GET /api/isu/:jia_isu_uuid/graph

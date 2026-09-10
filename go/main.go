@@ -24,6 +24,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+
+	_ "net/http/pprof"
 )
 
 const (
@@ -196,6 +198,7 @@ func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
 
 // global values.
 var jiaURL string
+
 func init() {
 	sessionStore = sessions.NewCookieStore([]byte(getEnv("SESSION_KEY", "isucondition")))
 
@@ -214,7 +217,7 @@ func main() {
 	e.Debug = true
 	e.Logger.SetLevel(log.ERROR)
 
-	 e.Use(middleware.Logger())
+	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
 	e.POST("/initialize", postInitialize)
@@ -256,17 +259,21 @@ func main() {
 		return
 	}
 
-
 	// global変数のjiaURLに代入する
 	var config Config
-        err = db.Get(&config, "SELECT * FROM `isu_association_config` WHERE `name` = ?", "jia_service_url")
+	err = db.Get(&config, "SELECT * FROM `isu_association_config` WHERE `name` = ?", "jia_service_url")
 	jiaURL = config.URL
 	if err != nil {
-                if !errors.Is(err, sql.ErrNoRows) {
-                        log.Print(err)
-                }
-        }
+		if !errors.Is(err, sql.ErrNoRows) {
+			log.Print(err)
+		}
+	}
 	fmt.Printf("DEBUG: %v", jiaURL)
+
+	// pprofを有効化
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
@@ -487,6 +494,7 @@ func getIsuList(c echo.Context) error {
 	}
 
 	responseList := []GetIsuListResponse{}
+
 	for _, isu := range isuList {
 		var lastCondition IsuCondition
 		foundLastCondition := true
@@ -1034,7 +1042,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	var params []interface{}
 
 	if startTime.IsZero() {
-		query,params,err = sqlx.In(
+		query, params, err = sqlx.In(
 			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"       AND `level` in (?)"+
@@ -1114,38 +1122,74 @@ func getTrend(c echo.Context) error {
 		characterToIsus[isu.Character] = append(characterToIsus[isu.Character], isu)
 	}
 
+	uuids := make([]string, 0, len(allIsuList))
+	for _, isu := range allIsuList {
+		uuids = append(uuids, isu.JIAIsuUUID)
+	}
 	res := []TrendResponse{}
+
+	query := `SELECT c.*
+	FROM isu_condition c
+	INNER JOIN (
+	    SELECT
+	        jia_isu_uuid,
+	        MAX(timestamp) AS max_timestamp
+	    FROM isu_condition
+	    WHERE jia_isu_uuid IN (?)
+	    GROUP BY jia_isu_uuid
+	) AS latest
+	    ON c.jia_isu_uuid = latest.jia_isu_uuid
+	    AND c.timestamp = latest.max_timestamp
+	WHERE c.jia_isu_uuid IN (?)
+	`
+
+	query, args, err := sqlx.In(query, uuids, uuids)
+	if err != nil {
+		return err
+	}
+
+	query = db.Rebind(query)
+	var conditions []IsuCondition
+	if err := db.Select(&conditions, query, args...); err != nil {
+		return err
+	}
+
+	conditionMap := make(map[string]IsuCondition, len(conditions))
+	for _, condition := range conditions {
+		conditionMap[condition.JIAIsuUUID] = condition
+	}
 
 	for character, isuList := range characterToIsus {
 		characterInfoIsuConditions := []*TrendCondition{}
 		characterWarningIsuConditions := []*TrendCondition{}
 		characterCriticalIsuConditions := []*TrendCondition{}
 		for _, isu := range isuList {
-			conditions := []IsuCondition{}
-			err = db.Select(&conditions,
-				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC LIMIT 1", // Add limit 1 since we need only latest one.
-				isu.JIAIsuUUID,
-			)
-			if err != nil {
-				c.Logger().Errorf("db error: %v", err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
+			//			conditions := []IsuCondition{}
+			//			err = db.Select(&conditions,
+			//				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC LIMIT 1", // Add limit 1 since we need only latest one.
+			//				isu.JIAIsuUUID,
+			//			)
+			//			if err != nil {
+			//				c.Logger().Errorf("db error: %v", err)
+			//				return c.NoContent(http.StatusInternalServerError)
+			//			}
+			isuLastCondition := conditionMap[isu.JIAIsuUUID]
 
-			if len(conditions) > 0 {
-				isuLastCondition := conditions[0]
-				trendCondition := TrendCondition{
-					ID:        isu.ID,
-					Timestamp: isuLastCondition.Timestamp.Unix(),
-				}
-				switch isuLastCondition.Level {
-				case "info":
-					characterInfoIsuConditions = append(characterInfoIsuConditions, &trendCondition)
-				case "warning":
-					characterWarningIsuConditions = append(characterWarningIsuConditions, &trendCondition)
-				case "critical":
-					characterCriticalIsuConditions = append(characterCriticalIsuConditions, &trendCondition)
-				}
+			//if len(conditions) > 0 {
+			//isuLastCondition := conditions[0]
+			trendCondition := TrendCondition{
+				ID:        isu.ID,
+				Timestamp: isuLastCondition.Timestamp.Unix(),
 			}
+			switch isuLastCondition.Level {
+			case "info":
+				characterInfoIsuConditions = append(characterInfoIsuConditions, &trendCondition)
+			case "warning":
+				characterWarningIsuConditions = append(characterWarningIsuConditions, &trendCondition)
+			case "critical":
+				characterCriticalIsuConditions = append(characterCriticalIsuConditions, &trendCondition)
+			}
+			//}
 
 		}
 
@@ -1224,11 +1268,11 @@ func postIsuCondition(c echo.Context) error {
 		}
 		rows = append(rows, IsuCondition{
 			JIAIsuUUID: jiaIsuUUID,
-			Timestamp: timestamp,
-			IsSitting: cond.IsSitting,
-			Condition: cond.Condition,
-			Level: cLevel,
-			Message: cond.Message,
+			Timestamp:  timestamp,
+			IsSitting:  cond.IsSitting,
+			Condition:  cond.Condition,
+			Level:      cLevel,
+			Message:    cond.Message,
 		})
 	}
 	_, err = tx.NamedExec(

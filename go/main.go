@@ -296,7 +296,7 @@ func main() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	db.SetMaxOpenConns(10)
+	db.SetMaxOpenConns(10) // TODO:大きくした方がスコアが高くなりやすそう, あとでこれの意義と最適なものを探る, 負荷状況、ボトルネックの場所によって最適な値が変わる
 	defer db.Close()
 
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")
@@ -568,19 +568,13 @@ func getIsuList(c echo.Context) error {
 
 		var formattedCondition *GetIsuConditionResponse
 		if foundLastCondition {
-			conditionLevel, err := calculateConditionLevel(lastCondition.Condition)
-			if err != nil {
-				c.Logger().Error(err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-
 			formattedCondition = &GetIsuConditionResponse{
 				JIAIsuUUID:     lastCondition.JIAIsuUUID,
 				IsuName:        isu.Name,
 				Timestamp:      lastCondition.Timestamp.Unix(),
 				IsSitting:      lastCondition.IsSitting,
 				Condition:      lastCondition.Condition,
-				ConditionLevel: conditionLevel,
+				ConditionLevel: lastCondition.Level,
 				Message:        lastCondition.Message,
 			}
 		}
@@ -884,7 +878,16 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 	var startTimeInThisHour time.Time
 	var condition IsuCondition
 
-	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` ASC", jiaIsuUUID)
+
+	// 全部のconditionをとってくる必要性はない
+	// from start hour -> end hourまでで良さそう? (date単位？), graphDate -> graphDate + 24hour
+	endTime := graphDate.Add(24 * time.Hour)
+
+	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
+		" AND timestamp >= ?"+
+		" AND timestamp < ?"+
+		" ORDER BY `timestamp` ASC",
+		jiaIsuUUID, graphDate, endTime) // 元のロジックでは, endTimeIndexより小さいデータをfilterしている
 	if err != nil {
 		return nil, fmt.Errorf("db error: %v", err)
 	}
@@ -933,22 +936,22 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 				ConditionTimestamps: timestampsInThisHour})
 	}
 
-	endTime := graphDate.Add(time.Hour * 24)
-	startIndex := len(dataPoints)
-	endNextIndex := len(dataPoints)
-	for i, graph := range dataPoints {
-		if startIndex == len(dataPoints) && !graph.StartAt.Before(graphDate) {
-			startIndex = i
-		}
-		if endNextIndex == len(dataPoints) && graph.StartAt.After(endTime) {
-			endNextIndex = i
-		}
-	}
+	// ここのロジックは不要, すでにこの間の時刻のconditionしか取得してないから
+	//startIndex := len(dataPoints)
+	//endNextIndex := len(dataPoints)
+	//for i, graph := range dataPoints {
+	//	if startIndex == len(dataPoints) && !graph.StartAt.Before(graphDate) {
+	//		startIndex = i
+	//	}
+	//	if endNextIndex == len(dataPoints) && graph.StartAt.After(endTime) {
+	//		endNextIndex = i
+	//	}
+	//}
 
-	filteredDataPoints := []GraphDataPointWithInfo{}
-	if startIndex < endNextIndex {
-		filteredDataPoints = dataPoints[startIndex:endNextIndex]
-	}
+	//filteredDataPoints := []GraphDataPointWithInfo{}
+	//if startIndex < endNextIndex {
+	//	filteredDataPoints = dataPoints[startIndex:endNextIndex]
+	//}
 
 	responseList := []GraphResponse{}
 	index := 0
@@ -958,8 +961,8 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 		var data *GraphDataPoint
 		timestamps := []int64{}
 
-		if index < len(filteredDataPoints) {
-			dataWithInfo := filteredDataPoints[index]
+		if index < len(dataPoints) {
+			dataWithInfo := dataPoints[index]
 
 			if dataWithInfo.StartAt.Equal(thisTime) {
 				data = &dataWithInfo.Data
@@ -993,6 +996,7 @@ func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, erro
 			return GraphDataPoint{}, fmt.Errorf("invalid condition format")
 		}
 
+		// TODO: テキストじゃなくて, なんか違う形式でこのデータ持ちたいなぁ
 		for _, condStr := range strings.Split(condition.Condition, ",") {
 			keyValue := strings.Split(condStr, "=")
 
@@ -1003,6 +1007,7 @@ func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, erro
 			}
 		}
 
+		// TODO: あんまり意味なさそうなことだけど, 一回一回やらなくても集計された結果に対してやれば良さそう
 		if badConditionsCount >= 3 {
 			rawScore += scoreConditionLevelCritical
 		} else if badConditionsCount >= 1 {

@@ -27,6 +27,7 @@ import (
 
 	_ "net/http/pprof"
 	"path/filepath"
+	"sync"
 )
 
 const (
@@ -55,7 +56,43 @@ var (
 	jiaJWTSigningKey *ecdsa.PublicKey
 
 	postIsuConditionTargetBaseURL string // JIAへのactivate時に登録する，ISUがconditionを送る先のURL
+
+	// trendにキャッシュを導入する
+	trendCacheMu      sync.RWMutex
+	trendCacheVersion uint64
+	trendCache        []TrendResponse
+
 )
+
+func getTrendCache() ([]TrendResponse, uint64, bool) {
+	trendCacheMu.RLock()
+	defer trendCacheMu.RUnlock()
+	if trendCache == nil {
+		return nil, trendCacheVersion, false
+	}
+	return trendCache, trendCacheVersion, true
+}
+
+func getTrendCacheVersion() uint64 {
+	trendCacheMu.RLock()
+	defer trendCacheMu.RUnlock()
+	return trendCacheVersion
+}
+
+func setTrendCacheIfFresh(version uint64, res []TrendResponse) {
+	trendCacheMu.Lock()
+	defer trendCacheMu.Unlock()
+	if version == trendCacheVersion {
+		trendCache = res
+	}
+}
+
+func invalidateTrendCache() {
+	trendCacheMu.Lock()
+	trendCache = nil
+	trendCacheVersion++
+	trendCacheMu.Unlock()
+}
 
 type Config struct {
 	Name string `db:"name"`
@@ -260,10 +297,11 @@ func init() {
 
 func main() {
 	e := echo.New()
-	e.Debug = true
+	// e.Debug = true // JSONをpretty printする設定, return c.JSONのところで時間食ってそうと思ってたが、そのうちの60%くらいをpretty print処理にくっていそうだった
 	e.Logger.SetLevel(log.ERROR)
 
-	e.Use(middleware.Logger())
+	e.Use(middleware.Logger()) // 結構CPUを奪われているらしい. by pprof
+	// 実際これを無くしたら, スコアが35k -> 38kへ, しかし, エラーが頻発してスコアが０になった. 負荷に耐えられなくなった. DBボトルネック?
 	e.Use(middleware.Recover())
 
 	e.POST("/initialize", postInitialize)
@@ -412,6 +450,7 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	invalidateTrendCache()
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
 	})
@@ -730,6 +769,7 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	invalidateTrendCache() // isuの登録があったら, invalidate!
 	return c.JSON(http.StatusCreated, isu)
 }
 
@@ -1209,7 +1249,14 @@ func getTrend(c echo.Context) error {
 	//for _, isu := range allIsuList {
 	//	uuids = append(uuids, isu.JIAIsuUUID)
 	//}
+
+	if cacheTrend, _, ok := getTrendCache(); ok {
+		return c.JSON(http.StatusOK, cacheTrend) // cacheがあればそれを返してしまう
+	}
+	cacheVersion := getTrendCacheVersion()
+
 	res := []TrendResponse{}
+
 
 	type TrendRow struct {
 		ID        int            `db:"id"`
@@ -1276,6 +1323,7 @@ func getTrend(c echo.Context) error {
 		res = append(res, *trendResponse)
 	}
 
+	setTrendCacheIfFresh(cacheVersion, res)
 	return c.JSON(http.StatusOK, res)
 }
 
@@ -1387,6 +1435,7 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	invalidateTrendCache()
 	return c.NoContent(http.StatusAccepted)
 }
 

@@ -20,8 +20,8 @@ go build -o isucondition .
 # validations
 sudo nginx -t
 
-sudo systemctl restart isucondition.go.service
-sudo systemctl restart nginx
 sudo systemctl restart mysql
+sudo systemctl restart isucondition.go.service  # アプリは後の方が良いかも, アプリが持つDBへの接続が切れる可能性
+sudo systemctl restart nginx
 
 

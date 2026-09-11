@@ -1,0 +1,407 @@
+
+# 16.2s user time, 30ms system time, 34.25M rss, 42.50M vsz
+# Current date: Fri Sep 11 22:55:43 2026
+# Hostname: isucon11q
+# Files: /var/log/mysql/slow.log
+# Overall: 344.08k total, 72 unique, 5.21k QPS, 0.49x concurrency ________
+# Time range: 2026-09-11 22:54:15 to 22:55:21
+# Attribute          total     min     max     avg     95%  stddev  median
+# ============     ======= ======= ======= ======= ======= ======= =======
+# Exec time            32s       0    65ms    93us   194us   699us    15us
+# Lock time             2s       0    65ms     5us    17us   142us       0
+# Rows sent          3.55M       0     436   10.83   19.46   51.91       0
+# Rows examine       8.58M       0   1.27k   26.14   19.46  144.36       0
+# Rows affecte     195.50k       0     618    0.58    1.96    2.37       0
+# Bytes sent       278.27M       0 758.30k  848.01   3.88k   2.93k   51.63
+# Query size        71.03M       6 790.36k  216.47  719.66   2.12k   31.70
+# Boolean:
+# QC hit         5% yes,  94% no
+
+# Profile
+# Rank Query ID                     Response time Calls  R/Call V/M   Item
+# ==== ============================ ============= ====== ====== ===== ====
+#    1 0x2223CFC36FBFC94AF77D296... 15.5955 48.7%  13358 0.0012  0.01 SELECT isu latest_isu_condition
+#    2 0xDA556F9115773A1A99AA016...  3.4911 10.9%  92462 0.0000  0.00 ADMIN PREPARE
+#    3 0xDBE3298F0280AB287A6FD19...  3.0488  9.5%  16669 0.0002  0.01 INSERT isu_condition
+#    4 0xFFFCA4D67EA0A788813031B...  2.4997  7.8%  21216 0.0001  0.00 COMMIT
+#    5 0x928E21E81CD470548A56AA2...  1.5825  4.9%   7699 0.0002  0.00 SELECT isu_condition
+#    6 0x273397513A3713E1498F7E4...  1.3948  4.4%  16669 0.0001  0.00 INSERT UPDATE latest_isu_condition
+#    7 0x2E50C0E75A4B0568600092F...  0.7947  2.5%   6912 0.0001  0.00 SELECT isu latest_isu_condition
+#    8 0xDAB07DF54E3EEFEA0EFB2A7...  0.7184  2.2%  16675 0.0000  0.00 SELECT isu
+#    9 0xB077CA9EB15F0BA54045A9E...  0.6374  2.0%   4139 0.0002  0.00 SELECT isu_condition
+#   10 0x262764FE7CE586B417A1206...  0.4871  1.5%   9617 0.0001  0.00 SELECT isu
+#   11 0x27AA5037BCA3145593C643E...  0.4430  1.4%    409 0.0011  0.01 INSERT isu
+# MISC 0xMISC                        1.3458  4.2% 138258 0.0000   0.0 <61 ITEMS>
+
+# Query 1: 218.98 QPS, 0.26x concurrency, ID 0x2223CFC36FBFC94AF77D296E8A08B14D at byte 143520523
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.01
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          3   13358
+# Exec time     48     16s     3us    47ms     1ms     5ms     3ms   467us
+# Lock time     20   361ms       0    13ms    27us    54us   187us    12us
+# Rows sent     89   3.19M      28     436  250.50  400.73  106.62  246.02
+# Rows examine  94   8.12M       0   1.27k  637.10   1.20k  406.77  652.75
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent    55 155.60M   1.56k  20.88k  11.93k  19.40k   5.11k  11.91k
+# Query size     2   1.86M     146     146     146     146       0     146
+# Boolean:
+# QC hit        17% yes,  82% no
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us  ##############
+#  10us  ###
+# 100us  ################################################################
+#   1ms  ###############
+#  10ms  ##
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu'\G
+#    SHOW CREATE TABLE `isucondition`.`isu`\G
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'latest_isu_condition'\G
+#    SHOW CREATE TABLE `isucondition`.`latest_isu_condition`\G
+# EXPLAIN /*!50100 PARTITIONS*/
+SELECT i.id, i.character, l.timestamp, l.level FROM isu i LEFT JOIN latest_isu_condition l ON l.jia_isu_uuid = i.jia_isu_uuid ORDER BY i.character\G
+
+# Query 2: 1.40k QPS, 0.05x concurrency, ID 0xDA556F9115773A1A99AA0165670CE848 at byte 138476374
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:15 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count         26   92462
+# Exec time     10      3s     7us    31ms    37us    69us   178us    23us
+# Lock time      0       0       0       0       0       0       0       0
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent    18  50.31M      52   1.61k  570.59   1.53k  539.30  183.58
+# Query size     3   2.65M      30      30      30      30       0      30
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us  #
+#  10us  ################################################################
+# 100us  #
+#   1ms  #
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+administrator command: Prepare\G
+
+# Query 3: 277.82 QPS, 0.05x concurrency, ID 0xDBE3298F0280AB287A6FD19CE0433945 at byte 82183419
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.01
+# Time range: 2026-09-11 22:54:21 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          4   16669
+# Exec time      9      3s    18us    56ms   182us   247us     1ms    76us
+# Lock time     26   473ms     5us    11ms    28us    38us   144us    18us
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Rows affecte  82 161.80k       2      10    9.94    9.83    0.50    9.83
+# Bytes sent     0 872.33k      52      54   53.59   51.63       0   51.63
+# Query size    38  27.44M     407   2.18k   1.69k   1.86k  150.97   1.61k
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us  ################################################################
+# 100us  ###################
+#   1ms  #
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu_condition'\G
+#    SHOW CREATE TABLE `isucondition`.`isu_condition`\G
+INSERT INTO `isu_condition`	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `level`, `message`)	VALUES ('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:05:49', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:06:44', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:07:45', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:08:40', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:09:43', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:10:44', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:11:46', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:12:47', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:13:42', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ'),('e9fde019-6697-41e5-a3ff-536e6e1bbd53', '2021-08-20 17:14:42', 1, 'is_dirty=true,is_overweight=true,is_broken=false', 'warning', 'ã©ã„ã¦ã‹ã‚‰æƒé™¤ã—ã¦ã„ãŸã ã‘ã¾ã™ã‹ï¼Ÿ')\G
+
+# Query 4: 347.80 QPS, 0.04x concurrency, ID 0xFFFCA4D67EA0A788813031B8BBC3B329 at byte 147670583
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          6   21216
+# Exec time      7      2s     1us    19ms   117us   247us   635us    18us
+# Lock time      0       0       0       0       0       0       0       0
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent     0 227.91k      11      11      11      11       0      11
+# Query size     0 124.31k       6       6       6       6       0       6
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us  ##############################
+#  10us  ################################################################
+# 100us  #######
+#   1ms  ##
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+COMMIT\G
+
+# Query 5: 126.21 QPS, 0.03x concurrency, ID 0x928E21E81CD470548A56AA26A02EF04A at byte 96244161
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          2    7699
+# Exec time      4      2s    27us    44ms   205us   384us   910us    93us
+# Lock time      4    76ms     3us     4ms     9us    13us    69us     5us
+# Rows sent      3 137.21k       0      20   18.25   19.46    4.94   19.46
+# Rows examine   2 221.45k       0     378   29.45   97.36   32.54   19.46
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent     9  26.01M     663   4.73k   3.46k   4.07k  814.39   3.52k
+# Query size     2   1.64M     217     225  223.20  223.14       4  223.14
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us  ################################################################
+# 100us  #####################################################
+#   1ms  ##
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu_condition'\G
+#    SHOW CREATE TABLE `isucondition`.`isu_condition`\G
+# EXPLAIN /*!50100 PARTITIONS*/
+SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = 'f7d178b6-fe61-42d6-98da-7bb8871858ed'	AND `timestamp` < '2021-08-22 01:09:09'       AND `level` in ('info', 'warning', 'critical')	ORDER BY `timestamp` DESC       LIMIT 20\G
+
+# Query 6: 277.82 QPS, 0.02x concurrency, ID 0x273397513A3713E1498F7E461C43ED66 at byte 82140800
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:21 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          4   16669
+# Exec time      4      1s    13us    17ms    83us    89us   507us    28us
+# Lock time      7   141ms     3us     8ms     8us    11us    84us     4us
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Rows affecte  16  31.96k       0       2    1.96    1.96    0.22    1.96
+# Bytes sent     0 179.06k      11      11      11      11       0      11
+# Query size    15  11.29M     682     760  710.49  719.66   16.17  685.39
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us  ################################################################
+# 100us  ##
+#   1ms  #
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'latest_isu_condition'\G
+#    SHOW CREATE TABLE `isucondition`.`latest_isu_condition`\G
+INSERT INTO latest_isu_condition
+  			(jia_isu_uuid, timestamp, is_sitting, `condition`, level, message)
+  		VALUES
+  			('f33a5479-be96-422a-abdf-108d57c30ec0', '2021-08-20 17:15:35', 0, 'is_dirty=false,is_overweight=false,is_broken=false', 'info', 'ã„ã„æ„Ÿã˜ã§ã™ï¼')
+  		ON DUPLICATE KEY UPDATE
+  			is_sitting = IF(VALUES(timestamp) > timestamp, VALUES(is_sitting), is_sitting),
+  			`condition` = IF(VALUES(timestamp) > timestamp, VALUES(`condition`), `condition`),
+  			level = IF(VALUES(timestamp) > timestamp, VALUES(level), level),
+  			message = IF(VALUES(timestamp) > timestamp, VALUES(message), message),
+  			timestamp = IF(VALUES(timestamp) > timestamp, VALUES(timestamp), timestamp)\G
+
+# Query 7: 113.31 QPS, 0.01x concurrency, ID 0x2E50C0E75A4B0568600092F5B65D90F4 at byte 132528907
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          2    6912
+# Exec time      2   795ms     5us    16ms   114us   214us   373us    66us
+# Lock time      3    63ms       0     1ms     9us    14us    34us     5us
+# Rows sent      1  36.82k       0       9    5.46    8.91    2.52    5.75
+# Rows examine   0  67.29k       0      18    9.97   17.65    5.53   11.95
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent     3  10.55M     655   2.33k   1.56k   2.16k  429.60   1.61k
+# Query size     3   2.29M     340     355  347.79  346.17    6.85  346.17
+# Boolean:
+# QC hit         6% yes,  93% no
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us  ####
+#  10us  ################################################################
+# 100us  #######################
+#   1ms  #
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu'\G
+#    SHOW CREATE TABLE `isucondition`.`isu`\G
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'latest_isu_condition'\G
+#    SHOW CREATE TABLE `isucondition`.`latest_isu_condition`\G
+# EXPLAIN /*!50100 PARTITIONS*/
+SELECT i.id, i.jia_isu_uuid, i.name, i.`character`,  l.timestamp as latest_timestamp, l.is_sitting as latest_is_sitting, l.`condition` as latest_condition, l.level as latest_level, l.message as latest_message FROM `isu` i  LEFT JOIN latest_isu_condition l ON l.jia_isu_uuid = i.jia_isu_uuid WHERE i.jia_user_id = 'pensive_kare' ORDER BY i.id DESC\G
+
+# Query 8: 277.92 QPS, 0.01x concurrency, ID 0xDAB07DF54E3EEFEA0EFB2A7F9D0674F5 at byte 139939107
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:21 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          4   16675
+# Exec time      2   718ms     4us    15ms    43us    76us   298us    17us
+# Lock time      7   143ms       0    15ms     8us    12us   163us     3us
+# Rows sent      0  16.28k       0       1    1.00    0.99    0.02    0.99
+# Rows examine   0  11.77k       0       1    0.72    0.99    0.44    0.99
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent     0 976.99k      50      60   60.00   59.77    0.20   59.77
+# Query size     1   1.29M      81      81      81      81       0      81
+# Boolean:
+# QC hit        27% yes,  72% no
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us  ###########
+#  10us  ################################################################
+# 100us  ##
+#   1ms  #
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu'\G
+#    SHOW CREATE TABLE `isucondition`.`isu`\G
+# EXPLAIN /*!50100 PARTITIONS*/
+SELECT 1 FROM `isu` WHERE `jia_isu_uuid` = '7604ada5-8a97-4cd0-a1cd-7734d7749789'\G
+
+# Query 9: 67.85 QPS, 0.01x concurrency, ID 0xB077CA9EB15F0BA54045A9E79E07F4F0 at byte 132529500
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          1    4139
+# Exec time      1   637ms    24us    15ms   153us   247us   468us   103us
+# Lock time      1    30ms     3us     3ms     7us     8us    58us     3us
+# Rows sent      4 159.30k       0     180   39.41   97.36   33.16   38.53
+# Rows examine   1 159.30k       0     180   39.41   97.36   33.16   38.53
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent     9  26.72M     663  25.75k   6.61k  15.20k   4.96k   6.31k
+# Query size     0 707.35k     175     175     175     175       0     175
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us  ###################################################
+# 100us  ################################################################
+#   1ms  #
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu_condition'\G
+#    SHOW CREATE TABLE `isucondition`.`isu_condition`\G
+# EXPLAIN /*!50100 PARTITIONS*/
+SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = 'f4de3b5d-9a16-45e7-b4cb-310c357770ce' AND timestamp >= '2021-08-25' AND timestamp < '2021-08-26' ORDER BY `timestamp` ASC\G
+
+# Query 10: 157.66 QPS, 0.01x concurrency, ID 0x262764FE7CE586B417A1206082D32E11 at byte 158387020
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          2    9617
+# Exec time      1   487ms     3us     9ms    50us   108us   276us    14us
+# Lock time      2    49ms       0     6ms     5us    10us    69us       0
+# Rows sent      0   9.32k       0       1    0.99    0.99    0.08    0.99
+# Rows examine   0   4.38k       0       1    0.47    0.99    0.49       0
+# Rows affecte   0       0       0       0       0       0       0       0
+# Bytes sent     0 950.44k      75     118  101.20  112.70    6.38  102.22
+# Query size     1   1.11M     113     128  120.71  118.34    2.29  118.34
+# Boolean:
+# QC hit        52% yes,  47% no
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us  ###############################################
+#  10us  ################################################################
+# 100us  ######
+#   1ms  #
+#  10ms
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu'\G
+#    SHOW CREATE TABLE `isucondition`.`isu`\G
+# EXPLAIN /*!50100 PARTITIONS*/
+SELECT name FROM `isu` WHERE `jia_isu_uuid` = '33481e44-d9f2-4d75-ab12-29ee13876195' AND `jia_user_id` = 'recursing_tharp'\G
+
+# Query 11: 6.70 QPS, 0.01x concurrency, ID 0x27AA5037BCA3145593C643E21671646B at byte 140716914
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.01
+# Time range: 2026-09-11 22:54:20 to 22:55:21
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          0     409
+# Exec time      1   443ms    70us    65ms     1ms     4ms     4ms   366us
+# Lock time     18   339ms    29us    65ms   827us     2ms     3ms   273us
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Rows affecte   0     405       0       1    0.99    0.99    0.10    0.99
+# Bytes sent     0   5.06k      11      90   12.67   12.54    7.32   10.84
+# Query size    20  14.29M   5.06k 230.71k  35.78k  97.04k  32.21k  24.75k
+# String:
+# Databases    isucondition
+# Hosts        localhost
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us  #
+# 100us  ################################################################
+#   1ms  #############
+#  10ms  #
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS FROM `isucondition` LIKE 'isu'\G
+#    SHOW CREATE TABLE `isucondition`.`isu`\G
+INSERT INTO `isu`	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES ('e4793078-e722-46c8-9cb9-1f1df5965761', 'ãƒã‚¤ãƒ‘ãƒ¼åº§å¸ƒå›£', '\ÿ\Ø\ÿ\Û\0\„\0\r4\"@.0&4LCPOKCIHT^yfTYrZHIi\jr|\€\‡\ˆ\‡Qe\”\Ÿ\“\ƒ\y\„\‡\‚>\"\">\‚VIV\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\‚\ÿ\À\0\ô\ô\"\0\ÿ\Ä\¢\0\0\0\0\0\0\0\0\0\0	\n\0\0\0}\0!1AQa\"q2\\‘\¡#B\±\ÁR\Ñ\ğ$3br\‚	\n\Z%&\'()*456789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz\ƒ\„\…\†\‡\ˆ\‰\Š\’\“\”\•\–\—\˜\™\š\¢\£\¤\¥\¦\§\¨\©\ª\²\³\´\µ\¶\·\¸\¹\º\Â\Ã\Ä\Å\Æ\Ç\È\É\Ê\Ò\Ó\Ô\Õ\Ö\×\Ø\Ù\Ú\á\â\ã\ä\å\æ\ç\è\é\ê\ñ\ò\ó\ô\õ\ö\÷\ø\ù\ú\0\0\0\0\0\0\0	\n\0\0w\0!1AQaq\"2\B\‘\¡\±\Á	#3R\ğbr\Ñ\n$4\á%\ñ\Z&\'()*56789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz\‚\ƒ\„\…\†\‡\ˆ\‰\Š\’\“\”\•\–\—\˜\™\š\¢\£\¤\¥\¦\§\¨\©\ª\²\³\´\µ\¶\·\¸\¹\º\Â\Ã\Ä\Å\Æ\Ç\È\É\Ê\Ò\Ó\Ô\Õ\Ö\×\Ø\Ù\Ú\â\ã\ä\å\æ\ç\è\é\ê\ò\ó\ô\õ\ö\÷\ø\ù\ú\ÿ\Ú\0\0\0?\0\ë(\¢\Š\À\±\ËÖL\‘O\«[ÂŠ(\¦ \¢\Š(\0\¤\¢\ŠQE \nC\È\"\–\ŠL\n\ã\¥-\'BE-dh-\n\r\0.h\Í%X\\ï>\¢\¢\—\ï\µ=N$Zv\à\ñV\µV\¹U\ºS&\®=\©\'\åa\z\\ì\²C\ø\Ó\äb\æES\Ó\•h\ÚJOoÎ\±I\\¼\¿\\Œ.VZ^\”\ùah\˜+\È\Ï\ÁRÕ‡\¸w\§Sis\Ç#A<b\™\“I\š\0\\\Ğ\Z\˜\ç\ç\ P\¶\«m\Ìk\ô\©êµ«Õš\Ü(\¢\Œ\Ó$(\£4f\\€QE-Rf\Š\0Z)(\¤EPA\¢\ƒI\\ı\ÓQ\“N\”\ü\†\¢\Š\¸lS\34L\'LE\›f\›\è\¿Ö®\Öu\”\…R\±\¼\„\ã!q\Ç_SV\¾Ñ\½\Ã\ş\Ÿ\åT\¶\'\¢\¡\ûL}Ã¯\Õ\ş\”\¢\æ\ÿ\0-P}N*\“B\±-Õ’6\û\®\§\èi\ÕB\n(\¢\€\n(\¢\€\"\¢\ŠL\Ö\‹R\ö\¨s\ÅH\§**\¢&:\’\Š*\„QQ\¨C\”2\¨a\Ô\ƒR\ä\–\ãI\½\‰h\¦\‰\ôa\ù\Ò\î\´\¹\\¬-\›\\ïKN\÷\0\¢\Š(\»\ñ#QK/}E%fh\¶\ŠLÑš@.h\¤&\Œ\Ğ1	\Ã)\÷\¥\Ÿ\ïf\˜\ç\Š|\ü\¨5h\—\¹d\€}h\¦ÅŸ)r1\Å:\·3\n(\¢\€ \½M\Ğ\î\î\§5C\µj\º\†B\§\¡\¬\¬q\ÏQYMkr\â\ÍgkS\½\–\–\÷6\ß,\‹\"\ƒ\F{V\gk\ë\¿C\¼\°F\ü\˜R\†\àÌ¸5\­M\¬\Z\ğ\Û\Å$(\û\q\š\Û\Ñ\ç\›U\´\ûLb\Óq]\…\‹0#×Š\£\àR\“\Ø^\ÚÈ»\”0b\¸#\úT\•\­\µ{\ËN\Ò\õS\\å\ü\«^H\ö#\™\\ØÍœ\î\Œ\ã\ê+=mnnV\Æ\\Ng(\Ÿ\å\Û\ş5\×IÂš\à\î\íbÑ¼Kn\Ñ\òK\\\ö\ÏÏµW*\“;KTx\ñ\•\'nA\­Z\o\Õ\Ş5WX\äf\n	\Î{U\à$\0\ÊO\®+\qI\èZwZ\\£Sp\ÿ\0\Ş_\û\ç\ÿ\0\¯N\\\ã\’\Ğb\”Rlb\ŠZ)\ò\ˆJ)J\ÿ\0\´E&\Ï\ö\š\Ÿ#)h\Ù\îß!\Œz\·\ı\ôir1\…\›\û_\÷Ñ£`\÷\ÿ\0\¾\@E&\Õ\ô\ıib\\•\'(\ÔS@C\ÑW\ò\¥Ú¸\áG\åI\\ì\¾[\0A5\\7j\Å\È\Ä,:j\¢NZ\¨lSÍƒÖš\Í\Å1\œc\¨\¨\™\Çv\SCK9y\ÿ\0\à?Ê¯\Öv\r\Ó\ó\W\ùV\\«D\½ÂŠ(\«$kF\\÷\‘O\ÔS~\Ïh\Ô}*J)\€v\¤ \ÿ\0x\ŠZ(6\Ÿ\ïÒ\§\û\ç\ô\¥\¢\€!\¢\€	\è)\ëX\ZjH\Ï\ËQS\â?1\Ô\Ö\à\ö$\¢\Š*\ˆ\n\Ã\× \ı\è|}\á\ú\Ö\çz\¡\«ÇºoCX\ÖW\‰\¶\\\µ9\°sZZ}\É\â&\é\Ø\Ö{)c%0=+\’2\åw=y\ÅN65\î\œ\Ç\"\ç\î\‘ZVS	\ \r\Üpk*\à\ù\Ö\ê\ã\’*]B\£=\ë\¢2\´\ìy\õ!zw\ê\z(\¦\°Êš\İ\è\\")\¸\"\˜\r9]\±\Ï?Zq?\ì\¯\å\\\ê\¢)Hfi3S\¨R>\è\ü\©J\\î\Êµ\éq\ó\ËRf\§\à@\ÇÒ¤Ú§\øG\åD-;\‹\˜\¦ÇŠ\”\¶_\0\â\‰^\Ñ?\ÖH\Š}7sL\ób1b5\•\×\Ô.?\+U	\»\–b}\ñ\†<S\ª;\õ\IZQE\0E\¡g\¸u_\\\şuz\ \–\¦H\Û4\š\¸\Æ!NN}3T<Ek\¡İ²30~\¢\§!\âpJ\à\ƒ\j\¦\»,\’hw\\ø\Û\å\1\õ\“{4\r\¾\0|^]\§\¬`\şG\ÿ\0\¯Qİº\é\8\ó\\\í\Œ\È\Ÿf\ş\¤\Õ\n\ê\é\ú\º\É3\ŠDdf=\»\\Ô\nl\ï\'\ˆ<B\£\…30Q\ì\ \õ\Y\'\£\¹Y=\±\\o\‹\”\¼Ì§\š\ìUB\ N\Àb\°\µ\û-\”\è1\÷r?i\’\Š\êU\n\™\€-}G\"\ºq\ë\\\ˆ?O\†`rd\„g\Ş\õ\Ó\é\î\'\±\‚Q\üQ\©\ı+*\Š\íX\ÑlOÖœ\´`\nZQ\\\àQE1QVŞŠ(\¤i)h\®b\„\íM\“\…Ñ‡\ó\¥\Ç\ñ\ƒ\õZl\›\ös\´\ò:qŞ®)_q\­\Ì/O,\€\Ä\å\·\ĞU8\µ\Ë\Ø\ø,\®=\ÅO\âo\ø\ıO\è+\ªi6{\”)BTcÌ®jÏ®<\ñ\¼o\½\Ÿ\åP\ 2.\å\Šr|\\ğ\ª\Ë\0}k\©\n\¡\0\U\£:Ğ¥J\ÉDÃ’%S\’\—\˜\¨@\ç\·\ı\ô?Â·\ä\Œ`\àV\©\‹\¶^Û©\Ê((Æ”\ï\î\šZ]\á\±%2l\•\†Y\ÏNŞ•Ó\•\p3(\ç\ŠÓ´2\Ù\ÔSq\¶ÇŸ\ˆQiJ*\Ä\ÔQE\ä\n(\¬]^\î\ê\Ê\à\¼R\\‚\Œ\\Û\úV\”\à\æì‰”\”UÙµEaA\â\‚x??Ò®Å­X\É\ÖR\‡\ı\ j\åB\¤wD*\Ğ}M\n*}hFE\Ä\÷\Õm\µ\ÿ\0\Ÿ\ˆ\ÿ\0\ï\¡Y\òË±^\ÒÅŒ\â@3\Á)\ó}\Ü\Ô;\¶\•oCÚœgY\ÕV\ç\¹Vf\Æ\Ïq\¤\Ò\Æß¼\Ò)CR\†Z\¢\ƒEYP_\0Ö\ô\ÍOQ\Î7@\ã\ÕML\¾8\è\Ó9Y\†\Z\›R\Üj×œ\÷=\Ø\ê\+\Ê\ôæ¦„\ùw\0\û\Õ}22Ä¶x\éS\È0\à\úWJ\¿*g$\í\ÌÑ´9\éF8\¦\Â\Á\¢V\§n\ÆFOl\×ZH\ó\…b0\Ä{ÔPSe\ÿ\0Zi\É\÷Mp\ÚÍ¡u<Ô•\à\ÔÃ‘ZRwV\Ö\Õkè²\».á¸=?*\´\Õ\ñÅœ\\·v\Á\»J{\\e`FB\a\Š\±I\\š\¥\¹\û\Û\Ó\ê*å¦¡j\Á\”J\àkX\¦S.\Ä\Å\\Æ¬\Ö4Ú¤Q>\˜\ \­\A\rm\ˆ{\…QLAEP8R\¸`1\ïX~&XaĞ®\Ê\è\²2\¤\ä\ÿ\0w\ô\­\Ú\À\ñ$s\êZD\‹,\‹o;\¸\'\í\ø\Ğ\Ô¶\Ó\Ékq\ñISQ\T\F\¤\ O\Ò5X5[Q,D	\ú\È\û\©\ÿ\0\n\µ4bE\Áå–—SY\Ü,\ö\òu\î;\ûWw\¨I\©Ë¦Au\§ÈŒ\nl\õ\éÒ©c6\\¬\·v\r\Ò	7G\ş\ãWE\£\Z\\#w+\ù\\jK\«\İk\Ì\ö\æY6\ìa+\ü\«\»\±\\¢\´D`A\à\ısS%tRÑ’\ÏJp9\¥\Å\0b\³\Œ\\YAEU\ˆ(\¢\ŠQL\\´\»i\®\ÛX|\¤\ı4\ÊO\ğ?\åX;&\îU\™&\0\¤a\ò\äS\Ÿ\ù\æ\ÿ\0\§\ø\ÒO?\—nÒ²\•\Î;\š\¸\´\úN\ö9}vO;P\ô+7\½]\Ô_Î½f\'ÏµR\¦\÷>\\Š\µ4\¼\‚\ºkw\ßmz\¨\®f\º>@\ö\‘\ã\°\ÅTt1Å«\Å2É¬-I|\»\Ò\Ø\à\à\Ö\æk\'YL:?\¯Oc3\´\ìk\õ\‹>\Õ\Í\Ü\ÛÜ´\Şm\µÜ\’3\…\'\é\ı+~6\ße\‘\İ*\¡\‡p\Œ\\È(z\Øæ”\ä\„Ñµ\ëX/3;g!\·d\â\µXF d\ö\ÍU\·\‰\¾\â\ c\ş\îH\«Q\é\ò	!?E$\Ë‹w\Æ\í\ÈOM\Ã\•\âL\£pr\«sÙ’\ ,\†R\'\¥P×—Ê¶\·\‡v\âk\£\¿x\Œk?q\˜\œw\¤\ïKEz\ç\š7b\œy\¤\ gh\AN\·Ò¤N\Ù>\´\Ù\'\†?\õ\’\¢\ıX\n\ù\îD{7byG\¹\¾H\îMW}V\Éx\ó\·ERj\´\º\ı\²\œ$R\±\úN\ÈWf\®8\Å&*\°\º\•\¤\†%un9\ÿ\0\n\¯.\©j\Ÿ1\¹w\çî¢€?\Ï\ãI\´f\!z\Ö\Ş |\ân=]\¿\ \ÿ\0\Z\©.\©\¨\Ë\ÿ\0-`\öE\ù\æ\£qØ\é\±3/B\¤\ƒP\Å5\„\…\‹\»brI\ë@q\\S\¦\Ó=\š5\¢\\\²\¸0\É\ş\É\ê+R@%\r\œ\Õ„\¹<\€OÒ¬Cr\ñ+`UE\¸\«I\n\¥>gx\îo\Áo\æB\Œ\ÒÉ‚>\èl\n\±\¼Q\¤`^\ÿ\0\U\Òn\Ö\ûI\ù\–\¯W|^\šMD\Ô\Úey\ø\”{\Šâ‹¯\¾\Ÿ\\ô\¦\×]&Ì‡v\©W\î\ÔT\ôn\ÔSi2\‡\\”\ÖP\èP\ô#\H:\Ö\Íj3\–\‡G\’I\‚#\»`\r\Å\Îv\\•\«m\¢\Åm\ó\Ë?^\¸\àV\„6\í\ÊU\Æ$m\Ø\ÇJ\©sc)r\áÌŸ^\µ\×\¤\‘\ WL\‰\¹U\‘\¾\›\¿\ú\Õ~Y\"VA\…#\€F1Y0Æ©2\ù\¹\Ú5\°\¸\Ú\n\ô#\)\»\ÛP\ĞZ(\¢\¤aEPY7qZ\ïn@\”\®=\óÉ­j\§\¨\¡av\Í\0s7z,\\¡\\\ƒ\È\õ\®r\óM\º\³c\æ\ÄJ\\ã^Ew\É\Ê\ÌGA\Å \‹\ŒUZ\â\¹\æ\Õ\èZ4\©s\á\"\±\†#d \r:Ò¾\ktwX\™\»\œ`\Õ\ËKX\ìle\¶H\¼\¤$\í\³\»#\ÿ\0\­CVLW<\Ídx\ØvV\Á\Åh\Ã\â-ZØ·\®G\û@\çYÒŒJ\ã\ı\£L\©e\—\®k\·×‰m\r\Ê~\î\ƒ\0~UÕ¬Z\¢\¨\ó/\â-\ß\ñ\ü\ë\\Ğ.>Ë­\ÚI\Û\Ì\n~\‡\\ë^\˜Ã¨\ªD\¶f\\M\«DT\Å,\\â\r\È\ÖV\«\â\‹\û)b\Ö\0XI\ÿ\0\n\è\™2=\ë\•\ñ\¤ [\Á.ß˜9\\\ıG\ÿ\0Z\†	\\Ñ|K\©\İŞ¨\š(\ä\·	S8\ÏZ\ì\»\×\à\øi\³92\¾\Ğ\ş\¹\®\¦\Úp\ö\è\\\ü\àa\¾\£\ƒQ-\ÊZ\–(\¨\ü\Å\õ\ Êƒ\ø\ª9\‡bB3I\¶\‘?NG\­:\ª\É\ê!\ŒB\ı\ã\Šl\ÛJ\\ã+\´\“R\Ò\õ\¡%\§\©\ÂÜ¹\’fc\Ü\ÔX\ã=\«\¶\—M\²\›\ï\À\§\èH\şUNo\Ú?\ú\²\ñ\ş9\§Êf\úV\³M\­Y\³\»kf<eOQZ\²xnA\ş\®\á[Ø®*\”\º\ú!\Ş=U\…f\ÿ\0X\¡Q[\˜\·\ÚK\Ê7\áU\µ\•\¢*N[\µf\º\²1V\Ô\ZJW{4\"\Ÿ2f\æ\/\™nb\'\•\şUf\Î3\"`@\Åc\éSy7\‹\\\Á\­\ËU\Ûr\ê;\óV\¶8\±Q\år\óÔºb\ˆ,C\æ=I\¦n\‘\Ç\Ì\Ä\ûS\ö\Š0U\ }\²m\Ç\0~\•\ƒ\âO:$N\Š\½>\µ\·1`\"\Œg,\ßJ\ç\µ\Á\I\Ğ\ã\é\ÅtaU\ê\\\Ã\ıÂ(\ \œ\š+\Ó<\ñ(\¥\¢\˜Î.t\ëy\¥}\€\³6\ì\í\Ï\å\Ç\—{p\³Ë•Qs\·\èMZ\»0j\Zk^D\‚)##p^\à\Ö@N\ı\ë\ç\\ög\²\‹\ºq\\¯a\©n}*ßˆ\¬\ÂJ\—(\¼?\Ê\Ø\õ\ÿ\0?Ê²\ÕH \×Oj\É{a\•C\‚0\ßQUk\¡l\ÎWk})B}k\¦m\"Õ@u\ú\Z\ˆ\è\‘g\‰X~r\¡\ÜÃ†	dm\±\£1\ô\¯Ã¤]\¹\•P\´Â´\í\´\Ólå£œ\Œ\õ\ù\ú\õu\‡\Ş}ß…;$+\™\‘h\‘\e\\·\²\ŒU\˜\´\»8\D!\\«sW(\È\çÚ\ù\š\ê\"\ª\¨Â€\ Ö°M\ş\¶o|sQ\Ëke\'\Ñ>c\úUw\Õ	\ÿ\0Sn\Ç\ŞC\´S@&Ö¨\‘tÈ¢}\ö\î\ñ0\ô9\‘\©%7\¨\¤\§\\ø\õ\Ê\Õ&\»\»\\¬H\ÿ\0\Ü^Z\…\ i9\•\ÚS\ş\Ûg\ô\ nm\î>\ù.fd\Q\nt\Ús\Ÿ^\õuNk<F\•P1\è*d\›\“\ƒ\3\Š\å\«I\½Q2Õ—\§Uu\˜Ö$\Ëf\‰\¹a_Ö—<\Õq \õ\§\‡\É\â\´R\–\Ås\"\Í\Ø\Ï \Šuw\§up$I\'\ßPi\Ê6\Œg<\Ò\Ğ=\r;\€QE\0QE\0TWK\º/\¡\ÍKA\ë@\"\·g@\\Ü\ç=\ÍJ\"\;}\ù\©\°1\\Õ\„\•\ü\ª\®M\€\Ê|\©\Ç\åP\Ëpw,rGÄ€\í`8Ô¼\‡\áD\û^\ù\æ	_\®\Ò?\­)\œ.\ùwÍ¼\ü\¸\í\ëQT\×\ZL\Œ#\ç×¥CRP\ô,\„H\¤eXc\\õ\ë\n\âH\Ñ\ÇFP:\òJ\ô\í\nA.\‡d\À\ç\÷A\Ç\ô\¦\‰\‘p\Ö\‹\áh\²62cea\ù\ã\ú\Ö\õS\Ô\â\ó\ì.\"#!\£a\úU	\¾p\úI^\é!\×\úÖ\Ù|\ù0v\ä\ã\ÔV\ƒ\¦\Ì\'\¨!\«\ \Ó\î1\«\\\Ä\Ù\Úb\\‡\òÔ¬\˜\ïb7b@\2I\À\©\Ú\öA\óe\¸\­Y\™\¢aØœ\şU!`)r\®\Á\Ì\ÌTm^\Õ\ü\¸`\\Ğ\ó\™\ü+N\Şy\œ~\ö \û9\ş\ T\û\‰\è3G#\­=ã¤5[\×\ş\­Hj$\´)\r\"\\Ä\´\´\•\\Û&\ö\ô\¤\³\©HÑ±H5%i\°ft\ºM\¤\­\ºH\˜\Ÿ_0\ÔGE\°\ò\Å\ÿ\0\ï\³ZÆ˜Ã½\'tj\«\ÔZs30i\nr#\“?\ï\Õ\Èb\Š3\òFI\Æ>c\šq\ë\Š|=M%)_p\II{\Î\à0\›s\èi\Æ>\¿\8\Œ\{sL\Ãn\‘\ÀQ\Øt\­SfDsK\Ì\i2\Ôf\¹MBS-\ô\òu\ù\È\ñ\Åu\ø%IQ\†=\ë2\ÓA\‚?\š\å\¼\ç<\ã\¢\ÿ\0\õëª…H\Óm\È\ç\­Q$\qs\‚y\ü\¨\Íw*\ª\ŠT*\\0\¥#\Å\ƒ\Z\°\÷\­\¾\¹\ı\Ó/\ª\ù\œ=Ø:Ìœ\›h\¿\ï\šO\ì\Û/\ù\ö\\ş\ù\ª\ú\ä{\õYw04\Ó\ÿ\0Ñ—;L\Î\ŸAP\ˆ\›\µG\á\N\İ4\Ãis\\ï\Ê\ë]%\µ\ l;[\¤@\ö9c\ú\ô\¯9\­nw\£FsÈ­}\ÙY\â`pÜcZm\²#o/#\¢\ñ\ü\©\²\\E\0Â€O\¢âš·@,Q@9\¢\¤\Š(\ \©jq\†\I\É\Á\É\à~v\™4bX\š2H\Ü:\\Ô\Š\±\…\è\0\Õ Q\\‡\èa9(	\È\ş\ñ\§\¼e?\‰I\ö9\¦\À\ƒ\€ä§Q:\¥\ÛÛ¨\¨\À\õ\«\›D\ğ)s\ó/\©\“\²\¸e\û\˜\úR \Û9C\İAo\ì\ÿ\02\“\–P	\ù}j\½\Äg\íP2+\0X\¡\È\õÓ‹\ê\öVl\²\Œ\ŸOj\š+)\\ú\ÇU\úsR$\»Kc\î\“\Æ=:Ò¥I\Ç\ñf\“\§Ğ‘\Ö4\ë\–\ú\š\™T(Â€>\”\ \‚\rG%\Ä1\œ<\Š\¦y\¡$\¶\‘%Ø¥IWtl{TR^\Û\Æ\Û\\Ÿ\û\¨7\ÈS,\‘\¬\ŠU\³\ƒ\èH\şT\Ø`HR<\ª\Œ\ñ\œ\ç5]\Ì\ÊZ86\®3\ºV\Ç\è3Q\ \x\Ã\Í;\0y\Û\Ê?>\¿\­4\…r\é\‘\‚\³\¨c\ĞÉ§UKx\£\…\²\‘\ã=[?\ZC\š\Zh\¢\ŠC\n(\¢\€\n(\¢\€\ëU\ïH\Š\Â\á\‡\\\éV+3Ä³\ˆ4K\‚N\0\ƒ\ß\'\ü3@kq\ş\¹\ş\µKp\™\»\û\Ü\ÔT\Øu^Ö£\ƒn\pv\£\’crx\Ü{{\Ö¹Z)=m\)\)\÷\®sÃ\"[\¨\Ò\Ê\õ\±8\á$\'\ï\ûzÜQe\Û!GZ\²,r\ZrOlN\‹\0?Q\úWAf\Æ?D;K\È\ç\ú\Ö7\ˆ\š8u=J6\æ\ñ\è?\úÙ­ÕŒ\¶\©h\é\\>\…M$6k\²\³\‘\ƒ\´\“NÂsQ\\<\‘Å•\ş\ğ\ç\¯\æ\¥\È\õ\ B\î\ö\¦\ó\½N\ã\ô\íK\š\–\úR\ÆG\\î}[\ü\şu)\¦\¢\„P\¹\É\şt\ãS\"\\ÚJZ1X\±\‰O\¦\Z}\\\…!\¥\¤\ª\\ˆ_\†4\è\»\Ñ \ä\Z\"\êk%\¹\§A\íÒš\¨\±\Á#\ß\ü\â\zSFz\ö\Åj\·3{\n2;\ä}(gÚ¥\›@\É9\¦\–px@GÖ™p7\ª\Ä\å\¡\Á\úw\­,MÄ\ú\ÚFÚ³.\á\ü$\à\şUc\­g_\Ø\Û^\İF\—\†BGz\¬,5\›\¡4\ó\Î~\¿\\ª\åO\¨\¹\š6\¨\¬q\©j@a\ô\·-\ßk\ä*_\í=C\ş\r\ÿ\0\ß_\ı\\ÎAÎK\Â\âE\Õh\»\N@\Æ\ÏJ\î^;\›\\‡aw\ny5\Êi\ö?\Ä\ÿ\0\Ã/\Ê\Z\í\ª[\ÑTM:\÷\oÒ¬\¤h\ƒ\äP>\‚\E+\±\‡z(4R\0\¢\Š(\0\¢\Š(\…\ÔX\œ\ã 0\Ï^;p\‡9r}Ú´/\ìVE\r\ƒ\“\Œ\n\‹\Š\¤\"=\¼Õ‹n/c\ÍF\˜|\€\š\–(\X3=\¨\’\ÒÂ¹\\\Œ\\¡\§nq\üF\œ\ã\ši\¯\Ş-Ø«\n\…Ù°v\ş+Rl_\î\¯\åQ\¡\ÃT\Õ\ÓM\Ş \†\ò\Ê\0\ü*?\ºÛ‚ o]\¼Ô´\˜\¦\Û\è\Çb\¼\\²7\•2\«Fz\ŒU{\à\"\’\'P\ƒ\·\€G\\T\³\Ş\Z\‡P$\Á\Ø\û\3\ü\ª\ğ\õ7+!\“\\H\¦Ø•\İ\ócb\¤,È€\0\0\·?Î«9R\ñ\¨\®O6<\ç\Ùk\…Ê·/;r\ây\ª\ò\\\\\Ø\ÁÓ¾GË¶\ïN\Ã\ùÖ¨\\Â\ü\ù?\¥@è²’\åFA\íÚ‹\Ê\ğ\ë\Ñ&FC\ßÒ¯\Å}\£(\Ù\¸\æ\¨I\§\Ã \åKkcgM\ñ+\èO\õ\è\°\Ä\ä\ns\íR\r\Ç\ïq\íJx\Ğ)jG`QE!\ˆ\ÊJ\\†\ª\Şé¶·\Ö\ë\r\ÄyE\û\¸$V\è\ ^\ç\Á\\¾M\½Û§\Ğ7\øV\\\ş\Ôf)\ \—\Û%O\ò\®\ñ\ˆPK\0\êMc\ê>&Ó¬IA!\šA\ü1\ÿ\0\6\Û\‡\½\Ğ\õ;Ì—\\±\\¬\¤0\\t\¬\ê\ŞÕ¼Sy\¨F\ğ\"\¬08\Á\’G\¹\¬\Z@:V\Ä^\"\¼[&\µ\˜,\ÈWhf\Î\á\ø\÷\¬z(\Ô\÷\†hv2\ık\³\ğ\ı\×\Û,\í%/\¿\®z#\\^\Ñ\õ	t\ëÔ–6Â’7\\Äf\©n#\Ô\é\n\«u+P\Êr\È4\µ#b\ôlQ\ş\©\œ\ğ9\ü)\ô\ÙF\…\ˆ\'\€\É4\î+$E\ö#\\½\ÍNj\¬3\Ü\Ës\ƒ\n\Ç\ï\±?\‡OÖ¬\šS\†\ŠJ\Á\”\œ\§\"\›Hi\§f;Q@9RV\Œ\‘\’t\¤\Œ\ü\Ô9\íL5\“z\š%\¡9\èi\î\n^\¢\š\Ÿw\ñ\­\ä=\…\Í1iK\•\ài\à\íK\¸Ş´ iH\ü\À\ä|\Ø\À\æ\ŒÅ¸ÙÆ¢r\Üc\U\¿\¥L\Ü\'Ö˜\€1=\©ri\¹dR\Y\ü\ë<r<\„\ìl×¨Y\\\¥\å\¤W\C\®x\í^I[\š\ˆg\Ò\ó)\–rW\¸\úSZ\«z-\•\¿k$\"_.dR:\º\à~d\Õ)\ü_f\’\b;\±J\ÌgB\ßt\ı)GJ\æ\ì\µÛ«\û\¤UDg\æ3\‘\õ\®\NEh\¢\Š@QE\0#\‚P\\ŒãŒ\õP\³\r\Ó\û\ªx\«SNÂ°\\ER\Ÿz\£\©e\ê*:\ó++M\ŒJ\˜\¨\¨\©\ñ\1N\“\Ö\À:\Š\r\³^\áy\¢\»\ŒÉ§L\‹\÷\¶\’>\£\š\³(\Ê})\±\ı\Ú\É{\³%\îfGt\ F\îye\ã&\­,\ñ\¿L\n\È\Ô\íe\’\ø\Å\Ë\Z?:u\–\–\ñ\¶\ö\–F>\„\ñ^\¬]\Õ\Èf\Ï[\ı\ï\~=Jp\ \€\¦HØŸ\ó\Ìs\õ?\äT\ˆ>\ëb\˜\€\¡\î\„~Z\ùD\’DpQ\Á<\ö\«e\É\êI\¨\§\ı\ä-\Z\Œ\±\€\©\\\¥\˜M\Ò2\¤\„\9\Æ>\½\ºT\ö\·pÎŠb\•w\Åfk\ë\º\ÆÙ¥\…\Ã× \® O-\´\¥\¡w\\œpk\õi\š%s\Ô\÷.q\}*#,\¹\À\„\ş&\¸|I}[\ZA*\ô*ÃµMi\âX\¡l\É`\®\«\ü\é\Ûµ\ÔqLÊ¬z*\œ\“\ø\n\«=\õ\ÉÈƒ`\ş\ô\‡\Ÿ\ÈV^*\Ó\Ì\Û\ÚÑ¢\ã\ı*\ô>\"\²\¸$E\Íî±“T\¬-Hn\Å\Ä\Ä\ù\î\Ò{\ƒ\ğ\¤\½\Ñ\ì\î\\\ÀÑˆ\Ş(w<\Š9İŒ\ó\ëWÆ£jÌ¹\Š\\\ç81\Õi5\%\ZQ%\Æ\Æ\ä9\¢\è59)\´k\Ä\ñFfD%G#\ğ\ª6Ò¤7\¦9\®\Ø\ë\ZBD\ÑEu\\ä\Û\åR\é\é\£j;\Õ]nd\ÁÈcAK@\Ôà¨¯C\ZF\™$h\æ\Ê-\ß\Å\ò\õ\üV\›F\³b\ài\ñ\ª\·C\¸\‚(\°\\\áh\®\ÉtM;q\ÿ\0F/`\í\ş4\ÿ\0\ì\‹.qh\¼\Œq\Î)\Ø.K\á\¯\Â\Ö)ox\åd\ŒmV\Á9\¦ka\µkb?s\ºc\ş\È\À\ü\Íb&\l\€\³\\c\÷\“6>\‚\®\Ábl\â\\ô\à?:v\ê+\²\üost\ÊÛ„q\‚2\©\É>\Ä\Ô\å\‹68\'\\å\ú:-\£\™y\\ª\®0GJ\™Qv\¨\À\¥q\ØdjCgn8\§\šZ*^\£Z\r&\šMII\´Vn\¸\Êi\©\nz\Za\\¾\µ.,\¤\Ğ\Ü\úR\ï4\„0\ê\r75:\¡\è)bM%!4\™\¤Q<M\•Ç¥)\áOÖ¢\\°\Õ8\ê}\ëX39\"&m\Ø\à\õ\§\ò\ \õ\0Ñµ}mtgb\¬\§:\…\°\õWÊ¥\ŞZwL \I\å\'\˜\¯\´nP@>\™\¨\ã\ŒF$y\Ë1c\ì(\¸X\”*\ã\¦hÚ¾\‚\«\ı\¦6\åcb=Lm\şy\é\ÿ\0<\\ı\ğ\ß\áHzK\¤\é\ó^\ÎOp\¸\¨Î‹j\0\¡@\è\0\ùU\‡\¿\µN<\ß1\‡h\Ás\úT\r\¨\Ì\üAj@\ş\ô\­\\ĞP2\\Z)\¢\ºnU9\“\ú\Z\¦\ú4CsG\…`\§\0\"\ò~\¸\«\Í\ö\™\ÿ\0\×\\\•^\é\Ú?3\“S&\0\À\íLFu\½\ºyk,-)~\ŠK\N\•\©kq\”Un\ú\Ö}\±)=\Ì`g\Ëm\Ã\ñ\é\ú\š\±\·h\0q\Š\0Ô¢\©\ÁrA\Û\'\­	\÷\¥`E\´RQE\ç\0QE\0Éº\n\Š\¤\›\ \ú\Ôu\ç\×\ø\ØÂ•N\r6\Š\Á;j\†ME1\±\§\×R|\Ê\è# \Š\‰;\Š\–\£<=g-\î&2D&`Bn\Ü:\ã\½J\\‘\‚HÂ¤\\¥:\½\É\ò\¤E\º\\´,2U\²I\É\Í0E#v\n=\ê\Í\\\Ì9Q\À\¿\ÄI\ı(\ó!\Œ\…d\œ`T3E0$\–2\§\§CP\¤\Š\Ò*F\\¸0\È\"\©+\õ\Ä^#Rlrzn\À\ü\«\„\¸\0\01\Îs]\ÿ\0\ˆFt\ã\ş\ğ\şF\¸;\‘\‚~\¼V+vh\Œ\ãÃœq\Í!\ëK Ã‘H\Ü\óTWucj\–vÄƒ\¶I\õ&\¸Z\î\´É¾Ó¥[Éœ\\»O\ÔP\"9:\×=\«[\Ÿ9\GÖº)\‡\Ìk6\ù9\r\jLg8Ë€\­\\\ÑnÍ–\§\»\°\¤\ío\¡\¨n\ã\ØF:T\Ë\œs\×Òš\é\öDK\Ù\ÈÏµYØ„`\+\Ãw*\Ö\r\–\†\ê;\ñ\ÿ\0Ö­C.zZW\†5\ûU\Äx\áH }EJ\ñd\¿/\¸\ª\ñ9\Z\”\à\\¨\¤U\ i\ZM\³\†\–G\‘}	\Åi\«F\Š\0!`F*\®F9\â\€\Ç\øX\Š\–\®4Ë´Upc\“k\Ï\0\9\ü*\Ôr\“\Ë\r\ w56\Éh\ \)\¬\»\ˆ \E!\\¢\£YĞ¾\Æ\ù\\	\©(MnT\[\ğ\ï\–\ş\ê\òk>k\é\¦\'\ÉC\Ù~\ñ\üÂ\Z\İ\Å\ÚIg\ş\â\š\„L\òe\¤P\œ\ğ\ \ç\z\¥\‘\Æ0\€\õ\Çzw\=k);\–\•\‹{\…\½ê§=h\óÇ­M\‡r\Ş\ê\š\Ëc=\«0\Ü(\ş!J\·aY[r\\œ\õ\§fcf\Š\Š+\„\•.y\í\Š\»\\Ÿ\¥oc2F;T\š\‰Â¹\²@\ì	\‚~d\‹\ı\æ\ö\ş\ºBp[\ğ\¦\‰byp\ÿ\0\Ï4\ü\…\\?Ü\ò9\…\r2\©\ôb)<\Ë\ù\ø\\ş\ú\Åc1\'5\\º\£\H\ÎqP\­\Ä=I?ALy\\û\°\Ø\÷4\Š.	\ŒR{\Öz#\©íŠWn4\ÅrWd\T=\ZV>\¸\©\ú\ö\ª\º\€$\\Ü²O\ë\ú\Z\¾\·\·\ä@\rg\ê#\ËH\ç\ò\Í\Æ\ïL?Â¬:\º16w\ç\n}>\´\·q\ı\¦\ŞX\ˆ:\\0\õ\§\Û\Û\Ê6y\œl\W\êz\“\ş}(\¸\ˆMË¡Ã«)\÷$W/!\Â\ßJ\¸\±\¨\ë\Í<\0\0\À\¥qØƒ\ı#t}3U\ä\š\á\ÌO\ø\Õ\ú)&(MbV3\¡P\¿x\ç\¥B5\ëf@Xc \ú\ı+Q\ÑJ\º\†S\Ô\š\­>\m9\Ë+)\ÿ\0a\Ê\ÿ\0*w]\ƒRk\ÿ\0\µ\³\›\ò3Ş¬SbÓ \ƒ&\Ú\ä`\±$\’>\µ\'\–\às\ƒ\\X\Šm\»\¡\¡\´\”\¤b\“5\Ä\Ğ\Ã5\"\¾x5%Td\â+\“5F\ôo8\Å&x\ª\”\“`\Ù<g\"\ŸP\Äy\ÅM^\…\'x! \¢\Š+A\…\Îzf\Š(7\Ä?\òc\èÂ¸K\7s\ù\n\î\üC\ÿ\0 \™>\«\üë„¹\û\Ø\ı)u\Ÿ0Ä‡4\  \“\Ó<Qp0Âœ\“\±\¼\'\¦\ğ\ã\ò#\ú\Ó\n\ê<\'0kY\à-Ê¶\à=\«\—\«\Ú5\ß\Ø\õ\ä\'\ß+}\r:ÛŞ³\î\×1\ô\äV\œ\Ã\åÈªS.\å#Ö“\Z0/\Ó0\“\èsY\µ\³p\›\£u\ã$X\Ô gg\á\Ä\öÊ€\äH\\ù\ì{\Ö\Æ\á\Û\õ\¬M\Ç\Ø\í[\Ñpk`\ı*\Ñ2 .WRx\ü\Z6EWvT\º\·vM\Ùb\¿\¥Y\•\ân2\µQ!\æ\|\Ğd\\•\\òFNzR\Ç0\ç\n*d\‰c\ä\ÍÚ€ \Ø\Ò\É )\”\'\†>\¾\Õl\î pG~\¦\\‘6\Á\ĞqMVV\\\©\Ï8È£@\Ô*\¿x\û\ÅK\»\¸|\¸\à\ã\Ïİ‡\û\·cwC\Šx\\‰F21\Û\ëR\ÊI\•ov\Ó\Ì8ERY\³\\£\­e\ÿ\0l\‰[\Ê\ó\Ùt`\–\ÿ\0\n\±\­<\‚\Ò\âM\¤)P3\Rr\Ç=\ë)Ë”\õ\ğ\ØxÔ‡\¼up\Û@\ß2\Ù\î{ÓÑ²6\‘\€r\æ\¹xn\¥\€\å\cÈ­85\×\¦}Öˆ\ÖOs*\™|Ó¼\Ë\î\‚Y\\y(\•\ã\·\ù\ö\¦7İ\Œ\Ó\ÿ\0Z\›i\¨\Ú\©\æw\Ú%Û\é\ŠÒ\ê\ŞA\òÈ¸\­+8\¥F\¬7E4\°-\ş\³r\ı?Ò¤\Zl@\Ï!\À\õ\«\à\¡\øSd#>^p\Í\Ğ{UY{\Å\Ó!\‘p\¯\"\·\®sP.\–Ñ»!l	ßËŠÒ’\ZD\"M\¨\§\'Ş¡2dyf|\î%\€\ÇOoz\¨\ãgE\ó\İ\şÓ–\­1\‘mSq\»\”\²\Œ\„\ù\n\¬n\®o9\‰L\ÿ\0\ÏG\'\è)\‰-\ª9\?{ \™\=;{T\¶;\ZÙ‘\¥bYR1\\ï\Ó\ÿ\0\×NŞ b0>\¦\¹\©\¯\ä\–Vfs\\Ç\ \¤]E\Æ6\¹\üé…\Ù-\¢\•Ë»>\ã\×G\ò\¦\ı\ŠY?\ï\á\ÿ\0\Z\Å:\¬\«\Æ\Ò}\è\şÖ—\û\•W\‹X\‰O\ó\¨$\½\¢2Ùª{\Ø/\Ş?\‰\¨\·\–p:\œ\ğZ@j\Çv\Ù\ÃÇ\Û\®\Ú9\–\â5\ÇS\œ\ûk6.0<\À\°)\ÿ\0\\‡\ıS\ùV\œ)\r\¤\Ê\Î\Ù\Œ\°\À\ã\§Z.\03y\æ/\\½\\«\°Y\”\VG\Ü@\Á\ÅP\Z\„\0(\I\÷\Œ\şy&\¯\Ã4\Ò.\à8\Ç\ü\´]\¿\¨\¤î‡¡iUTaF)j4\“\'6\Ÿc\jJ\‘\…Q@Q@\Ÿw\¬\Ù\ÛnUf\\Ôd\¬Cv>\§\ \¨Y\µ+\ÅÉ‘,\â=\ÎG× \§k\Š\æ\…\Õå½¢î¸™S=<\Ÿ\ \¬\ã\«\Ís?\Ùì­Š\±]\Á\ç\öO\éO\¶\²\‚\ŞMê™”\ğes\¹\\âj\½\Ùe\¼\¶\œÌ™\ö<\ÿ\0J|\¡r\Ü\"HFÛ‰\’\·,O\¥M\¸Ui\Ì\\\Ã\\Ò«\´\òA!\Ša\†\†\¼\ú\ÔZwC\"\Œ\Š\¤\· \÷\§yâ¹¹X\óF\ê\©\ç\Z<\ïzi\¸\¯\‚\«c\‘\š\Æ3\óZ6S\‰bÛŸ\™\•waŞ\±EW@ÂŠd\“G\ßp\§Ê {\ä\Ë l\À\»\“Ò€*\ø\\“\¦l^\®\àq\ï\ı+\…\™\³\óg\ƒ]G\‰\ï\¡\ˆF\Á\‘w\“\É#\½r\ù\'\Œ\ğ)u\Z \Ÿ\ï\n\z\ş\ùz\ŠHÔ±8\ì	4\0\Ê(\¢\˜\\¯B\¾v\D\\ûØ†9\î*Ô‹\\tIo2\Ëme\é]-\–\¯ov\¡f>T\İ\ó\Ğ\Ğ;\Ò\"v\õ\ÍbH\»\\\Š\Û\Ö\ÑT\£\‡\ö9\¬Wm\ï\“R\†t\şa%\´hç…\ì3]d\–g?!}\rp\Ş\”$\­?\‘\øW\¡\£oEa\ü@\Z\Ò\öFUÕºa\ˆ\È7\¬\\È\ö\«J\Š\î\£\Ü}}?\Z\¶Ê­\÷\€?ZS\\§h\ì:S\æ&\Åu\·cÌ\ø/\ø\Ó\å\–XYØ…U\ë\Mdj\\«\’B\~\±r>\µBx\Ú(\Ø\ü\÷\—bz\œq\ı\ì4F\ĞÕ¢\\ş\ï\\ïÖ­[\…\‘__\æ8\Íq($^\\Š\ëw=\á\Ö!\Ÿ\÷\\ÿ\0\\\Ò{\\\HÛ²9\ç\ÂK\ä\õ`I\¬\»K\¦\şÎš\á\Ç\®{\ú\Õ\İ>\à\Î\ä\à\à/^\Ô\ÄE\â6Æ‘ \õe\­r\­u>)}\¶\§\÷\¤\È\×*\İk\n\š#\İ\À+R\ù\†i\´QÚ¹\¯s\¸2iC\°<))(É’\êd\û\®je\Ô\îT\ƒ\¼:dU*|Q<\¹*xMZrd5\º/\ÿ\0l\İ\¼T\ş\£X\“~\â\ª[\ÜU&\·#\£\Ô,\…z\Õ^hÏ’\›\û&\¬\º\ÃL\»e]\À\õ\çÒ¡\Š\ú(\·l\ˆ\\Ã\æ\íY\ÔRç½\•?\åE\ß:\×90\±\ú\¹\©á½²@CY\ç\Œ\¼\ñYY\¥\æ\y	Ò¤\ô\å4M\³H\ÜT\œ\‚=(\û+z5i\é\­\æX\Äx\à`Õ­\§\Ûò­¹›<\º\”m7\¡\\Ñ\ÛDA\B\í\èN\Á\ù\·\ò\§E~\å\ü\›)	<e\Ë\êyc\ù\ÖÕ–\“a\¦\®\æP\ï\ı\ç\Ï\áV\şÖ½ \…\Ÿ\ÙFmo\™\Æd&\\¨\Ü/\ïnV\Õ[\ª\Ä0O\Ô\õ\ıjæŸ§\Ú\ÙE%\´\²\ù\Êfi8\æ\uwt\€oS\\àZË¹\¹Q3%\™FrM+\\¯%í²\ş\å#\û\‹\Ö¨É¬\ÊX\˜\ã\n\â3Y\ës	8fU\íZ\\Åbai>\Ğ%|}1Ha\æ\Ê%\İˆb76OnÕ°\“F\Ä.\àĞš\ÄfIHx\‹\õ\ÏoAZ0Z\£\âw\È#![\ŸJmh\³I>\ò\±Fq\ı\ìUigh{\›\¸\áQ\×{\\úV-\½\”\¯\¨\Ë\ú\ƒ\ù\ˆD\f=\‡Ò´o\¬4\¨lİ’(\÷\\ÆN\æ?\Ÿ5\ŸK\ŒW\×\ÖA\¶\Â&\Ÿ\·\š\ÿ\0\"\‰\ü*\¼\‰5\Û\¼\¹iW?\ê\£\ùS\ñ\îj\­\ºl\ŒU\»x%s\ò\ƒ\õ\íZ\¤Ce\È`\rna\Š\2\¤`p)t\ò\æ\Í	<\\”\ıG4\²\¹\È\úRÂ¡\Ğ\0\\¿^Æ˜\‡\¶|\¦=	\ÀSPj\°\çNv^\±\\ã\ğ?\áV_\Ÿ-}\Ë\å\ıhe\Œ\­\È \‚J@\"\„\Ø$$mq>\‚\¢H\\–\™A.w{f\™lX\Ç\»;\Ğu\«\\¸\¡\\š\úX\'0Ë³=\ˆÈ¦&\p\¯\‰+\ı\å\ç\ô\­OÒ—5\›\§\Ás\Z[g\Œ\— g\şY\µ@fr\±\®\ìs\œ\ü\Åt4\ı\ã\n\—F\€\æ\æ\†\î$\İ${T\àd\š\-IX2\ª\¡\õ/Z:\²t\Ù\À\ª\îQ\ÍKn\şl\¸$\îPiÆ”V\¨.dË«_Æ‡\÷(Np\\¹\ü3\ŸÒ¢:\¥Ä¬Îƒ\ÕQ\¿\À\ZÛ½\¶76\²\Ä\n\«\º\áX\ö4\è\¢h\áE\Â\î\¯sWd=L\û[\¢\ª<\»g\ğYbl\ŸÅ±N\¼\“Îšns\³\çbFy\é\ù\Õ\Ö\È\‘\Œ\n\¯n\»r;\€3\õ?1\şu]E}W\Ä\Ñ4SD\ã!HÇ½s\¬\ã\ê}\ëĞµ\«\Ô,Z/\ã\¡\ÇC\\EŞ‘\¨Z\ª\¼\ÖÎªA \û\n\–\µ./B\“\Œw\ëN\‚F\Œ\¾\®\Æ\ú\Z\Œr@\'\ô\¬\„{z\ú\Ò\‡\­%P \¢\Š(\0\¥\0\Œi(\ \Ú{2J9Ï­zV\›/\\§\Á\'\ª\n\ò\ëvÄ•\è\Ş\Z\\¾\‘\'\î\’?\¯\õ\§\ĞlÔ¢\Š)*9\í\á\¸]\³F\®L\\•%\\º5\šÌ²l\\„\åM3PY/\¦k(Ê…P\‰\õ\ô\ıEi\“\\š\¡\¥\Ç!i\®&\Œ\£\È\Ü \Ÿ\åN\à5t\ã\å\ÛÛ±\×-\ƒ\Ë1\ëZ\‹\ZE\n\£\ \Ùe\\ß+\„^\™&\ª\Ù\ß\ı\²\âh\ÖH\â\Æ\\Ş\'\Û\ğ\ 3|X\ÿ\0-\²z\–?Ê¹\³[\*\5\äQ\ƒ\÷?\™\ÿ\0\ëV\¬*3\ß\Á\«QB\Z;QGj\À\ê\ƒE%\°\«V;\¿x\İ\ÆMU\§E!\@\Ã\èj\¢\ìÉ’\º.J2\¤f\©\š\¸yc\µU\Á\š\Ù\ìLH\»\ÒR\\´\•\€	J\§@\Ò4,.\ü\ˆ\n\ïf\¬h\z\Ê\ŒU*\–V\£\«Gy\”1\òAv\õj\°\0\0`QEu\Ş\ç\Íê®¥XPk\"\ó\Ã\ñ\\HÎ“4`\ó\\¼\Ö\Å\€\äo|3,q3\Á:\¹\ÂT\Ö«\évwB9\¢\l\W\ı\Ş\ì,WmT\Ö\Ğ.\¢\³\ğP\…_\ö\S\ùÖ–\Ì\«\N\Ó@\‘\­\ÙK\\£\0\»{\\ÀT?\ğ\’Ey\Š\°2\³\r\ \†\Î\½Cuc\å\ì\·3r]\‰\ô\è\åR\Áa\Ápj\’\º\ÔiH\ò\â\Ús\ü#\ú\Õä°–Ne|g\¶riÑ«,`\“\ì*Ò¤\£\œG\íÕ¿!U\¡:\\\Ö(\ñ\\È\îjp\»\†\ô\\ñ\À7J\ÁG\¬\\ı0İ³.\è\á;?\¿1Ø¿\—z.&X\>\ùÏ \æ\’F(\¥P\ƒ!\ìÜ“\ø\n\‚Y\Õ#\İu8E\÷>Z\ÿ\0\‰\¨\"\Ô\íÌ«\nX2@\Ú?\Ä\ş4\\,_`|\ö\é\À\n;\ŸÊ‰\\ª\¤\\À\'\’j\´z\­\§\–I|\’\Ç+\j\³\ß\Å3\n\À\å\²{w\¡r\Ôî†(\08\ş\ñ\ä\ş\¦\¬dqYvsb-\Ø\å\Ébs\ëWRl\ã\û\Z\«X\Ëvr\r1e\È\!\7m\\\³\ú/5 I\šQ\Ï\‹\·\ß;G\ \ëR\¨\0`\nM\¡\¨\Œ1VV\ä0\Á\¥\†$\‚%\Š1\„Q\€)\ôT\\\»Q@4\¢J\Œ\úÓ¨\¢\àF\Ğ)\îES\Ôì¥¹\²0\Ä\Ès\ó\µ\¡E;\±Yq{\á\ıR&bl\Ù\ù\'td0?\€\¬\™\¡\š\Û4o\ôpEz\Ù\‘$\‹\‰]})\òJ+\¢\ñji\‰,b\ÅQf\ù\‚?\»\ÿ\0\ë\®v\˜Q@Q@\\¶\°5\ßx6m\ö\“FO*A\ÇÖ¼\ş\ºoŞˆ\õ/%\\«\·\ñ\íT\»\İ\ÑE QUå¼F\Ÿ;\’\ãBWweE,\Ä*\I\'\ \ªS_3F\Æ\Õ7Ç˜\ßw\¯oZ5IH\€\¢\à\å\€9\ü\Ï\ô\ü\ê \®b\Š \½{\€zs\ù\š\¤\„\Ê\òB%p\ó\Ÿ5\½[\·\ÓÒ¯i\‘,j\åT\0q\Ğc5	\ò\¡M\ò0\ú\\Ÿ\‡\­9/\Ñ4\é\îrp\„\…\r\Ü\à`b\›\Øq\‹n\È\ç5\¹|\íV\á\\È(\ü?\k8Ô“>\æ\'\¹\ë\ï\ïQ\\µ\ÉQİŸM\ò\ÁG\°\”\½\©(5\Â’\–\’\%P\›g$=\ºR\È2y\¨\í\ä	\•n3ŞŸ&\Ö\ï\ô\­\â\î\ˆ\êVo\¼h\¥lEd\÷) \œ \§\n\‚â…¢\–\Šv4=\n\Š\ÇMNq\Ô+}EL\º\¯\÷\¢\ü\v\Ÿ)cJ\Š\¡\ı\©x\Û\ó\¥\Z\¤?\ÜÒX\½M*\äcp\É\ô\ª\Ÿ\Úp\ÿ\0u\ÿ\0*\£\'\‡9\úP;\\@\’8\óPs\Àu\ë\ŸqU\ŸOt9BS\ŒT\§P\‰\\ƒ\ÅM\ÚL\Û@*}\é\¦+\Æ\³\Ÿ+d\Œ\Ø\áUv\ƒM\ûL\®\¥Y\Ä+\İ!\0\Ÿ\Ä\ô\²\ÊJ\°\§\¨#9\ª\·\Zm\\Â\í\–\İJ\\À\?JM\°0eÕ¬\­	1\á\¥J\ş\ñ\ÿ\0\ï\£\À\ü+P\ñ\rÜ\˜\0\‡\¶\ü\î\Ì\ô\ü+\¨\¼\Ñ\ô+d/p\¢!\\ù\èÆ°u	tC\Ãcg$\’0\À\\¹}\ñ\šC9æ¹\å\ó$\•İ½X\ä\ş\µ\±\£J\şE\Í\É\¸\÷\¬\ï\ì\ù#\\éŞµ^\Ù\í\´X\àA\‰&l\’y\È\äUka\¥\Ù2\ÿ\0\‹\‘\éZ9n\ß\ßo-}qŞ©[\Ø2FK\œ\ú\Š\¹z\ËGo\<\”\Ãz<\Ÿ\éN\â\±4r\•\0!\«Ix@\äd\ú\ÖtR\¡\0\äf\¥2\\‚\\Ä_\\å\æ\‘RV!	\ço\¥n\Û<\°-\Ê\ÿ\0d\×#æ²¸ s\ëS-\×Í¹\âB\½Ñ¿1I\«\u\ÎE\ª\´l\0\–P=?\¡\­[]A&6\ÜyO\ˆ\ê*\Zc/QIKRE%\ÀZ))h\0\¢\«]\ß[\Ú\0%\œ\ı\Ô^X\ıU\ö\ü\ş\ô\›K~\è\§\ça\î{SI\°\¹5Ö¥\å 3NzF\œ\Ÿ\ÇÒ«47\‡7\²\\´1\?\àG\½X\µ\¶\Š\Ú=\\¦\ĞNO\©\ú\Ô\Üb\´I\"\Œ-C\Á\ö\— \Ék)\‚C\Î:\¡\ü;W1}\á\íFÉa\óPGp\ÿ\0\Z\ôC\À\ú\Ñ\úQ\ÊÇ•\Éo4H\âeBv\î#\Œ\úTU\è\ÒÄ\­\¼R\¢\É\±\ÚÜ‚G\Å:MKp\ß\èq\®\î\»G\ò\ô\¥\Ê>c\Í\è\¯@\n\é,x\ŠEÏ£\š\¯w\á=9-\å\’6\˜2\¡`7w\Å+\è\á\êKy\\Şt\–3\†C\‘]\…\\†4\Ùì¡™\ÌÛ¤\\\Ÿ\›\Š\¹\ÿ\0\¾\”\¨q\ç1rJvh.\‰\ô\¯\Ù\Ş[\6A\ |\À\\µy\õ(F6e\\è\Í\ò\¯\æk\ş\è#9@\€z\ø\şb\Ÿ\ı\\ª\»\÷[\†\Ä\0\Ÿ\×4\ì\»Ë’\ß[\Ì\æ\'\¼Fnè‡\ñ5\"\Û\ã\¶FC`\ñ\ÓÚ©aC\ö\É\0\'\Œ\ÿ\0\ß8\ÅH\äÅ¾\Şf\\Ó,\\\“\ó\0\Á?\\åC\º\©=\´_i\ı\ô\›\œ\·@x=~\¿\ıj\§}\©R  \±o\—p\È\Ø}z[\é\æ\…7\É!\'\î\Œp\Ÿ\‰`\­(\¯e$\Ğz\ı\¢\î@nsÕ5\r\ôQ\Ú\Æ\Ñ\É#<\Çz{\ş5\²Ò¬#lH\0\ô\Ô\÷\¬=gsL\’\°\ÆF*&\ÚW;0V\ö\¦y9\¤\¤\Í$;u\®=\Ïq\±E!\£<f\’\\\ZJ(\ W\n(\íI@\®f\Š(Å¥\”PR)Âš)Â¥\š\ÄZ(\¢\­\"\\ÊZJZ\è>TZSÔ¢\“\ŠQ@\‡\n|lQ\ƒ/QL\”f\˜\Zw\Z\\½\­\—\Úgm\©Ó\}+\›\¿\ñM\Ì\ù[v\'M\Ì~oÓ¥kÆ‰s\–\’\€VQ\Æ{Æ¹\§\‹È•\ã\‘~d$cN\ú\I\¾\Ósq\¾}\Í\îO?\­jY=\œ$	\¬Ù”\õ!\Á\'\ô\¨C\Š8>\ÿ\0Zwb\á!\\²\ó\€W<\•\ö4\ıP\ùwk\È\òcU\ã\Ô\ò\;E\·İª\±\Îv*\ú\è\“\Ü\ÜI=\ÃÃ¹lu4\íd.\¦e\†e\»B\Ç .\ş\àVuÈ’i\Şf\å\¤%\±]\¢\èÖ©\‘)pd]\¥\³\Í`\ê:D\ö\€\¹\ı\ä_\Ş_\ë\éPİ™Fw_\áa\ïH\·l\‡\æ\çÚ§|\1Ql,\ã\å\Ü}1N\ábt\¼BpIZ\²\\ü\¯\œ~4\Û]*y\›\Àkf\ÛI\†\û\ç\É\ş\ä|\Ÿ\Ä\ôW\Œä‰$\’xP2MiZi\—;\Õ\Ù\ü\c\ËÂ´\­cDS\öx\„k\ı\àz\ıX\ÿ\0J\™P`\³\·\÷\Ê\ÿ\0\‰\¢\â)\\²\“\ü\¾\µb\ª\´\–\î\QP\Ë\é\ŒÂªO,\öQ<\±N5\Ù7?\‘\ëR\×Q\Ü\ÕÖ—\ĞW/k\â\¹\ï\£\¶\Ó\ü\ÇQ\“\‡\í\ëÒ´d\›X{W\›e\´ .\ìd\±\Æ);!\š7\Ú\Æd\š@\‹\îz\ı+=\®\ï/\¸\µCm\ÿ\0\–\²\™\‡\°\¬\Í;3MxZyC|\¬\İ\ĞV\Äw\ès\õ\«\ŒHr\Ú\ÆrYT\¼\‡\¬\w1\üj\Ã1P}\ç8N\æ\¢Yp\Ü\æ\›\æie\ÇE8\¨\’\Á\È\ë\Í\ô\¦\ç\©\¹\â\{\Z\ä\ğ)\0\ìi\Œ\¡zDZ\µ\Œ\˜\á\ƒ!5\¢\­f\ë\ÛL3\û\¹\×\õ\â\´I\0\¥a\¹O9R\®=hx9\©?B\Ç\öLJz\¦T\şq\‰S\È\ëU4\‘\å\­\Äg\øfo\çWYr1LdLÇ±\¨X\ã\ï6}\©f\Ş{JÍ\ğ\†! u&\€4\ê\ö\ö\¨g\Èd|`\·?\†?\ú\õV\Ús9\Ø\‚\Ä\EZ\½!\®\ˆc\\ó\è\'\¸\Ñ\ø\’\'\b\¾\áÑº\Z\†oE\²\Æ\ë0J\“\Í<:\Ò\î\ã\Š\0\‹É‘\Ï\ï&o\ â¢¼\„}\E\\·_\›$\şh\ç\±\ê:Q\:~>\´4T$\á%$r\ù\É\Í\ô\­=R\È\ä\ÜB\¹\ş\ú\\æ+(6k\Qqg\»J\´jF\èu\™\£5\·\ŠJ(Å¢\’\Šb\¸QIE\¸\êZm(\¤Rc\Å<Tb\)DuQT\™fà¥¤)ks\åB\–\\ÔSÔ£\ëM\´\Àu(\¤)Â™\"\¡\Á\È<\Š\§\â|\É\Úp\²\\¯\\Ì?\Ä*\¸*\Ô1Gu\ÛK\\§1\Ø\Ñk\Œ\åá·’W\ŠY\`2kr\Ç@\'\rtv\î\©æ¶­í¡¶M\°\Æ\Ô\÷5-U\û\Š\Ş\Úe\Ûj\ƒ\¾:\š\–\Š)\0QE\—{\¡\Ú\Ü6\øÇ”\İ\Â\ı\Ó\şzt6\­\+\§rp\¿\âkf\š\¬\“FHda\}iZ\ÛKiÛ´\°T\ô\Æ\Ñ\ùM;j \Œ\Ÿ\ÑjW\·a\Ì,\\¤\ò:cÛ¢.\é%\éÔ‘U\ \ˆ\ŞpNToV\í\ô\¬X3\ş$\â\¨\ß\Ü8\ß\öR$\Ú?\‹\¿\ĞRh\Éu\·\·N	l{\¹\êqN\ê\×3A \™\Ù\€\ó\—=\»\à\n\šk\¨\­\Ì\É A\Z($\ã?\\÷\®E\µ\»\Ì~\îWÜ³\–\ä\şf]\êz\‹[\ı\šK\¦xwn\Æ_\¯Z\›\İk\’\ëKc}$\Š\‘F^L\Û\ÿ\0_J\³&\µ1\ÒL\±\È	Ø¹A\’:W2N$\ÖŞµ\¾\Î\Â\ÎË€\Ê>z4J\ÁrÍ½\ë.\0\éZ_\ß†+\’\\ä\®2	>Æ´m\¤f \ŸÖ­2\Z:x\®WkÇ€N*\­\¶\¦cv	$\ã\¯5\08\²\È\ë`\÷\ÇZX\ÊFw\0Ó¸\¬n[\Ü8Û\™\«*\ë\üY\±c\Ÿ\'\r\øVV\ä(İ¿p\ïLV4\÷\÷H&\š\ïy\€Ï½f\½\ã\"\ã\Ô\Õvr\Ù,s@X\¹\©O\¾Ñ2\ª\Ê\Ø\îpjE\¸\'\î\\¾x\ú\Ök\¸h\™\À\È\ç&\®\"\â\Ê)\¡9\Œ\r\®=\r!\–\ü\õg\š\‘_+\Á\ëTVD#\“\ƒ\ß5 ,\ØÛ’O\¥;\€\–r\¿\¼\\X7\æ*\ÿ\0\˜3\\õ\“\—\‡Ul\çsÇ’>\•tH\r,0\ª\“Z\Æ\ç\ç\Œ\ô\©\Ã\ñ\\Ô\í\Ù^q@\ÊÖ¶\ê\“+*\áS\œUfF}\Î!\‰\Æ+H\¶\ËydB\à}O\ù\ˆ\À\è1S\Ô}\ÖR\0\ã\®)\¾\ã\µh\´`\´GgæŸ˜a}hzJ\¤\\Â\Æ{\zV\¬VQ\"\€\ÿ\0;z\“S\Ç\ZD\»cP\¢\Y\¹\\\´\Š\­el\…\Á\†\²\µ\‹\¹\{VH\äo\á\Æâ·4\Òz\«2\ã\'tp\Óh\ú\Œ-l\Ä\èw*\¦w+mpT\\Äb\½\™,1L\»e\d\Œ\¹\¨p:ã‹’\İ}\š3]\„\ú\Ÿ.J\Æb\'\º7\ô5\q\á\‰M\½\Èo@\ë\\ÔT83\¢8\¨=\ô0(\æ\¯O\£jgu\±`;\¡\İTYY\«\©VA56h\ÙMKfRf\Š\n\¸\´\áL\Í(4\†\˜\ğjE5i\Á\©X\Ö2&\¥\¨\ÃÑ¾\\Íy\‘\¾)İ©\‚\+s\æ\–\ŒP)\ˆ^Ô´\œR\ûSE8SE;\Ä8T\Ğ6\Ç;\Z\…jE\¦\€\Ø#4TvÍº\í\ÅI@\‚\Š(\ \Š)@Tt\×\ò\ÍÅ£u\\Î?\İ<\Š\¹\ó7\°\ª7ñµ´«\n\’S\‰\€\ş$\ÿ\0\ëS@]Ë·A\´z\šG\6G\É0NH4\ø\İd\]*\Ã \ŠZ@f\\\é\å-\ÉY\®\Œ\¦# \Ë\W=\Á\óGe\¡\ÜG\èy\é\ó1\ç\ùÖ¬\ƒp\ı\ #\š\\”\ÀC\¨`\ìX\‚3\Ô\ç\ú\ÔÛ¢\ç.\¸#\J\\?\rÒ»\ë\O\œ\ç\Ê1X\Î?N\•\™7\„\ÆKAu\ô\¿\ÔS\Ê\é\¶^n\«o7&\ğX\Ørj_\ÈeÖ¥\G\Øs\ú\“]>\—\á\é\¬\ï\Òy\Œn\ª6\ÿ\0\g\\h×’J\ÒKn\ûİ‹1^y<\\”\î\¬I\ÍB\’!Ï•\“\êOJ\·sK*\¯\—\‚\Ü\»\­h>\™s\n-\¥\é\Óa\æ\­iV~U\ø\–\â\"\¢2\°a\‚08\ıi\¦\€v\¨L\\ÚÅ´\¤	\†\ç\­D\¬\ç\’A\ú\ÓwI.\é]\Æ\ç%\=Pg,\Ä\ûS$pfC\–l\ı(.\Äg\'\èÊ©\ì)bYn\›Ë¶\ˆÉ“\Î;}i\Ü\n\ò\\\•o\\’>\µn\Ê\¿\d$u\ÏA\øÕ˜4[X\ß|\ìÒº\òQ[\\©\«j\¢\á(\Á\8A\ş4\®\ô\ë(\—2\¢JGR~\è\ü{\Ó.\ï#!!\\şA\ÑUp\¿\€\¥\÷8\’\á\¶\'m\Ã\’Ô€Cg\Êe\\\\¾Ü¿\à;S@\ÆG\Ú\Zv1\†\è\¸\ù\ˆ\úS\¤\»XC$\n\á\±\ÀC\–Ï»v\ú\n\©#I6w\±U=\\ä\ıM8\£q\Ç\åLi\ßi\„;\Üg$\r\Ã$\í\ú\š\¼$\òy\ª\à\³/\¥s\ĞP\"\â\ã\ïÇ¥=$9\Á\ä{\ÕXÃ±\Ê\ısW\"U{\0\\¹\ 	IÍº+\ËI2~\ƒ\ÿ\0\Ô*T\ˆ\¸\ÏA\ïL|\‰\Ğ(\ÉD\ıO\ÿ\0\ª\¬m\¸b3\íS{\"\­r%\ƒ\æ\Ëã•5%\›w-+E%\0RKHh))h\Å\ŠZ)\€S&\‚)\×l\Ñ$\ƒÑ”\Z}-\0e\Üx{N\›%ch\˜\÷\\±\ú\ZÍŸÂ®2m\®Cz	\¨\®\\ŠN)\šÆ´\ã\³8K\½\"\ş\Ğ\’Ü²\âC\¸U\ã\¥zD\²$14\’\°UI\®P\Ó\î\Ú\òi \±\•afÜ£\ª%\ÇM,M\ô\‘G4\¹\§}\’\ìË¬\¿\÷\Á\¦\ùÇ\à\ú\Š\Vt{h\÷Ñšp\ŠU\á\­ØŸ\­[\ÿ\0Ï³~f\F?m\çF\¼\€iÂ¢\\·\'\ĞÔ«Zlx\û\\¢\–\Š\0JQ\õ\£\´\ÀQN\ÚQLC\Å=i\‚\\¦\˜\¬\Ÿ\’\µn\³\­\ßl\€ÖSPN\â\\êi\0\Ü1\êp)@\ëKE\0 \Œ\ƒE\\™\Óe\ò\Ï\üz9\ù\ü\ó>\ŸJ\Ğ\Œ\ŠGE\‘\n8\§\‚\rg\»Ë¦\òU\¥\µ\îGŞ\üE=Å±cP\¸\¶\¯3\À\®O\¶7\‘^\Äd\„0P\Û~a\Š\Æ\ñ\r\ôSZ\À\°8trX\‘\í\Ó\ùÖ–\…\•\¥E\‘\ƒ&\\\ş=?LR\µ\¯q\—è¢Š\01M\\€\„\—\ØV\ô\ª:\–\«\ˆ\Ú\¥\˜\Œ\…\\Ä\×3uu}.\é\İ\Äy\á\…\ù\Ò\Ğ\Í}i5\ÊFEbv\¬\ªp\ª:\“I\ZM\Î\Zi]P\°\ù\0\Ï\ë\ÅT\Ò W\½\‰<\°A\Îw9c\ĞÖ–\¼\ö\ËwN\»^HÏ—\'\¸=?\Ğ\Ö\Ás$\¢\Ÿ\¥Eå´®\©\³\¹\ì*\ä6!\¶\µÔ…A\é|\»\…X\º\¿\¶Ó¡(1\0\ïg27\ûÇµU\ìM\ˆ\¡\Ò7\²\™\´\Ÿ\Ä\ö\¦\ê\Zİ®\Ÿ\’\N8\ò!8\0\ÿ\0\´\ß\áY\ŸjÔµ\™\Z\Ş\Â\°\óm8Q\î\ÍZ:\•\“y\³í¼œrI\â$?Ö“*\Æ}\¬z\¶\º\Û\äo\³\Ù)\Î~\äc\ükn\Ö9G\‡q\ÿ\0-\¥\ú\n\Ón/ZV\Â0\\„\Œ(\ú/\õ\¬\»\¥3\Íw$\÷$æ„h\İjo\÷\¢%s\ÖG\å\\øUh\î\ú\’O\©\ïT<\Às\–\ª|#\\„\ù\¹\æ\ª\â\±\Ò++H\§\¯L\Ös\Èp\°\¿=È­\ÛY\æQ\æ\¢\â\°\ı\àu\ã\Ó$q\‚70\ùGcS\­\Œpa\„\›\‰\ş\÷Z\©y\¨\Ãn\§y\Ğ\n\0\¾\ª\†\n\Ş\ø\¥IU\§E\ë\–\ç\Š\æ\°dl\±s\ëZ\Ú5Ù–I$l2Æ¥\ó\î)\±#DŞ¤wn\Ò6\’\¥\¿\»\j\ø!\—*A\ˆ\®j\ÈÜ‘\’	ëš³H\¿424-\ÿ\0LÛÊ¡\¢\Ó7h\¬\¥\»\»\ˆs\²e\£i5<z\œY\Ä\è\ğ\Ÿ\ö\†G\æ*,\Ê/\ÑMGWP\È\Á\”\ô æ–E%-0\ŒR\Ñ@\r\Å\ìRb\\…R\ÓSe\•!\\¤\•\‚\¢\I\¤\–D\†6\’F\n\Š2I\¬\å(\`V\æ(\Ï\ö\4\®\rØ’0\÷Î³Ì¤D9\Š3\üÏ½X\“p\Æ:Ş”\¸#\3\ši;\\ÓŞ´H\Î\åiK\ò\àz\Öt\±|\Ì\ã\–\şU\£:\\¤\\Ÿ\éT\ºp=i\˜Ñ\Çvs\íI\å}jÄœ9\íM\È\õ\¥b\…\\¼\¹\0\ìx5l=\©\¶\¶\q\‘o\©\ì*\åÍ»\Ä\Ãq\r\À\äp3Q8\Øqd+\È4\”\´\•#\ŠJZ\0)Âš)E0)\ëQ\Šx\¦\"d\õ\­D;\j\ÊCZ\¯\¹\n\úS[\š\Š(\ \Š(\ \Š(\ \¸\ÿ\0jv\·\\\3\É\Z\²\‚\¶9\®Â¸\¿\'\úL/\>@1\ëÉ¥\Õ\‹\r\û\¯\'\'=F8>\µ\×i~&\³\•)\—\É\Ú\0r\¿\ıj\àU\™y\ƒ\íB\’\¼\ƒ\Šêº—ÄŒ\ùm\±\ê\ò^\ÛE\œ\Ó\'\—\êsXW\ÚÜ—\nV\Û\÷q\ú\ç\“\ş\ÇE},}\ò*\Ê\ßB\ÿ\0\ëN*}\’{0rk\¡\ĞjS\Ç=\Ê,m\•\%Q\õ\ê\Ug\_Ö©Øµ\¹|It\Àv;w\Z×‚k8\˜\ù\¼s\æ\É\÷\¿JT\ä\º\œ{\—tY\…\Á\¸\–=\Š\…\¯=\ÿ\0\T\ñ\„\ /\â*W\Ÿ\˜\ú\ã\ó\­\d\š\Õ\æ\ùcËH\ñÛ½r\—1\ê2]\ßIz\\½\™\£\ˆd\\¼g\ğ\¬Zw4Mj^J\©ic\ó\n\Î[\ñ\ì*{=\‡\Ôd7u\òc<~&\›\ Ï<\¦pCs\´r\Z\½$\™Lgh\î\¿\ÔÓ³\–\š\ác\\Ê]\»\¤Q\r\¨\¿\\u\¨\ä\°\í\Û\ \ª\Î\û9%QG5<\²\¶!]\ÿ\0\ít\ì+\‰u+G\–\Ş\Ã\è9\¦\Á\'\™.\­\ì\Z\´m,\¦\—\‹\¹\»\“\ĞVå¦•8i\0\•\ı\Ç\ğ\¦\ô\})\›\÷\*7C\‚OD\Æ\Å_Ëš\ï\™U\”\«(*z\‚8\¬Û­%Z\Û\¹\Ø\ÿ\0\…E\Æs\°Z\í!\›\œV\‡\Û\r\¼{\E\0\­Tu;\—\°%^Y;\ü\ó\\\İ\İ\Ü\÷O\ºF8\ì;\nwAfk\Ş\ø\‰\Ù\ñ,\¿Â²\¦\½\ó	c\¸\“\êj\*\‚\Ä\Ô\Ñperz\×K\¤Hm\¼5ur\ç\æ\”\ìS\ú\s$\¢\ºM`}\“C\°\±\à1_1Ç¿Ôš\0\Š\…P6\°?\\\\\ï\Z\æw\´}	\ô\©\¢\¾\‘1\Gz.:\¥\½\À\ï\éS\­\À~\¿\ˆ\ÍsŞ©\ä\§\ĞÕ•\¿\0\s\éN\÷\\\ğX\\\ÄW\’W\¡\ú\\óÒ®\Úß†\n\³\€\¥\‡\Ê\ã\î\Ÿ\ğ5\ƒ\Ãg\’N<\Ö\À\ú\œ\Ô\ö\×JÉµ\›#\Ç\\Ò²c\½\\’\ŠÎ±\¼P<\¹		\œ+\ŞÆ´j,Pf\–\’\Ö€E?j\úR2\ã\‘E\‚\ãi\³I4\²\¸DQ\’Oj%\‘!\‰\¥\•\Â\"\Œ\–=s\Íy\ı\±\'\œN-\±\Ş#\ø\›\ü)\¥q7b\Â\ÌÚ”\âi\­\ª\Ç\ê\ß\í\Z\Ğ\§\\ÕIN\\İH\¦\—m\Şİkc;Ü¾[\¿s\ùP9\ä\õ\ª^w\÷\¹\ÅK\ö\Œ\‚q\ŠZ,	*\ÁN\â\¡eo\¥<I\µx9\Ïza\‘\ˆ\äg\é@\r\äNf=EE\‰\ıZ\º&\‰ä¨¤\û<\İZæ½©I	\Ê/*\íA\ì*Y\£G\‰\•\ÈÛ\§\µU\›Q\Š Dxlwè¢³Z\ò[Ûˆ\ãRJ\–\Ğ\¥FåŸt3\˜\Ü`\õ\ãÖ8\¦j\Î$\Ô\å?\ó\Ì*\ŸA\“\ú\š\Š99g\íP\ãa\¦Z\è\íQ\‡\§\¤1Ô¢\š\r(4\0\ñN\Ài\À\Ó*\œU\»6\ı\æ=j\’\š\\ŞM\’T\€Ó¢\Š(QE\0QE2i\¢\‚2\ó:\¢\\ä\Ğ\ë\‹\ñ\ù\ÿ\0H\´\¨\hj!wa\r\‚\à\‚\ì9?AY;\™d\Ô\áE`|\¸\¹\ÇbI\¢\Ï@9\º(V\ÈAE\µV\0T\‹4\‹\Ñ\Ï\çQ\ÒÕ«\­\„\Õ\Ë\ŞÎ\¥\S\–>\œ}\rR\¢\­JD8E\ô4b\Ô\Äy\Ä{s\×\êq\­q\‚\¹\î\ŠÇ¥\ª\¿t/gN[\è&`d\ÜqÒ¬G\ªB\ª\ØX\”SÓ°\½\š\îÎ¾\ÇaÂ@jO\øL\şy\§\ë\\m\½\œ;g\Ü\í\à\ñd/\‘\"\¨l\\ g\ŸZ\è-\çK\˜h\ÎQ\ÆEyEv^\Ôw\«Y\È\ÚL\Ÿ\ÌZÊ­(\ò\Ş(i\êÎ’\æ\Ú\¸\Œw,\ˆ{Ò¹]W\Â,I\§\¾\á\ÿ\0<\Ü\ò>\†\º\ú+\\£d\Ú<\®M:h\¤)*\˜\Øu9\¦5\™\ù\ûzW\§\ŞX\Û^Ç²\â0ŞĞ\¡\®kR\ğ\ÜĞ«5\§\ï\“w\ø\‡\øÒ»\Œ\å\´\Ëqs,3\¹\€\ıkW\ÅR\ï\Õ]FÄ¢?\ê\;Â–m\ı\±\™\\¯\’6\á\ŒqT\¯&\ó\®d\”\ã,\å\°}\ÍWK\‹\©\\Ğ\ã?ZBFGÙ§\ÌË“\´rz\ÔaY\\0\šH$\±\ä\“SZ\Ä\í:*\ı\æ`\0\¢(\}\ì\ô\Ín\èV\‰\Íw/\"2}o\çE\À\›R\ù&HÜB\çŞŸjÈŠ6\å\‰<Ş¢\†\Ú\â\şLB\¥\™\]\›\¢\ıMoY\Û[i\¨YX<\ƒ\ï\Ì\ı\ØSO\ \¬Iia\„].\İÃˆ\ÇS\õ\¨\ÍÌ–s\\„\Ñ\ùfOÌ\À\÷\ª\·Z\›\ÈÌ\’\õsÕ¿Â¡`Z\»!\\Ü¶\Ô-nÕ“c\ÿ\0q\şSWCs\\\Ò\Ú\ı\¥H)\½Gp3Ïµc]Ë®\éwb(\ŞdG\æ5\È~?\¥E\¬U\îzG\­Cus\r\¼&I\äX\Ğu,q\\Eî¯­E!\‡\í\ˆ\Ü}\ô_\ş\µS\…e\¼\º\ry3\Î\0$\î<g\µ1\ZZ\­\íÆ¸\şT[\¢\³\år\ş\æ\­\Ù\Ú\Çgo\åB3\I\¦B6\Œ\à\î<J\˜\ÁÏ¯\µRD\¶H\©R\ïNİ“\Ï\×9\¨\\ã\‘Ş“\'\“\ÛŞ˜\‰\•\Á\å\€\îi\À\ß­W.H\à\Å81\ë\\ô.ã¹9\é\éNß–9={Ta\ò0=)7m\Á\Ï\×\ëLDÅ”p\\\ñ\ïI\½\¼ïªˆ\²\“\“I\”\ÿ\0&\\ÌÏ´[,\ÙPx\ô\­M\ê	\†\È@X\ûv\ş\µ\Í\•<\°\Ån\è2(Óµ\ \ÛB\¦\À}	\ş\ª\\‘C\â\Œ\ß_\ÈÛ–0\îO\'Ş¦\\ûe\¦\\¤\²nid>\½\¿\¡\ü\ë\Z\ÚI\ V#\İªQz\Æ\şy\ˆÏ°\¤\õi\r\Zw\ñ-\«\.MŞ«\ÜUu\œ3\Í@\\€ß‰\ç4\¬\ªH\ÏZB\å\± \õ\§\÷\ªb<\0U\Ø\ZxŞ¤d\ä{T\ò\…Ë\ı\éÛ±T\Ú@\¤m\Üx\ç\"\”N=\è\°\Ë\Á\…<5g\‹\•\õ\§}\¨v\¦Cg8\•0O\Ì*\Ås)q2\âHÕ€\ì\Øâ®¦\°êŸ¼D\'\Ğ75V\¸\\šl\’$H^F\n\£\©\'\ƒ6\»9È\Çc\¿\ÿ\0\­Y\Ï%Ş£)Sl\’67bI\\Àp*l\­\ÿ\0\‰-\¡>]\¹?\÷\JÂ¹\’\ûR}\ã|\¹\é\Ç\è*\®.!\á1`\à\„\…A k\¹\¢\Ş\÷3\¸\ôG\ò\£Q\è_Ò´)\¼\ô\¸\¼\Wi\"\œ\œ\õ\®w\Än\²kÈ\ç\õ\®\‹B_-.\ç\É1\ÃlOÍ\ş\µs\Z\\ù\£|rA\Ï\ç\ÿ\0×¦\„\Êb\Š\ª\òR\ÒRÕ \nZJZ\¤ \¢\Š*\EU\¡E%-PQTW4Ë¦\´\¼\T\à\«\õ\ªt\£\i\ØM]\±\‹4),g*\êcN\¬O	\İ\ù\úo\’O\Í	\Ç\àÉ­\º\ó\'Y4ZwW\n(\¢\¤dR\ÛE.\òTu(\\p\Ø>\õ\È\ê\Ş\º@^Ì‰\—Ó£\ñ\®ÎŠMç•>X\œ\¤\«\‡U\†\©\Ò\÷\0\À\Åz5Õ\½\Úí¸…_	\Æ²n|<\¸?e\“\û\¯\ş4\¬\ú\†\‡7\ºF\ƒ\å\ç\¿Êµa\·U\µ\\Ş]\Ê.$Ë\‡b\ö\üM^\ƒN[<Fi\Èã‘?\ú\õ\Ÿy|\ÿ\0\ÚS4c;\Ëu\Æ:\ãÜš{\~\ê\òX\„J\}\ØS\©\÷jÊ–yn\›\çlm\è\‹\À\Ø\à\’ä’\ä#\’@$\Š\´md\…\—t.\ıÜ©\æ\­Y\î\Èb\‡h\ÜO5v+\©\ÆR\ÿ\0p*]6\ÔH\¯4\Ÿ\ê\¢í¦\\ö\»\‰\‚İ³\ı\’\\ˆ>fÏŒQ}l4\'s\§Xp\€\r\¸\û\ç\¿>\µ\…\¬]%\Å\ãÄ²\”\ÛË°\“\é\ô\¦\¶\¥*Ld\æH8\Æ@\ú\nÌ¸|\«\³\œ\ä\ŸSG/@\¸\èã¶— 6@?3\“É«P\¢\„Q\°\İ\ë$\’A2Fæ®ª\Öq@\‘\R\½\Ï\øÑ¥\ÃR\¿8\ô\ëF\åÔ\õ-\Ì\Ö#\"Î¬\£\³u\ª\ŸhV\®=\óÖ¨\’v%I\'\½&\âO?\­F%W8\švwc\‘\‘\é@\n\‚\ú\ô\õ\Îz\ği1\’\ä)7\Œ`y\ n\ç\ô\£a\ÇNsM\ã8\éRÛ˜\‹~\ñ\¸\\Ø\Ğ\0\ÿ\0\ºß…\û\¯Za\•\†w\À\Ñ\Ç\÷\¿ZW\4\ã>\õ\ÔJ\ëg\à\ØÑW\¼\“p#\Œ_\È~\µÊ\’\0\êk\¢\ñq\òc\Ól\\ÿ\0SH\÷?\ş\ª\’\Šzy*$\\¾U\6\Ş\à\èAf\Ï\çLe6\ÚH0\Ós\ƒ\è\ú\ÕR9\È\á\¿1Iopf\ÊH\­\ÎzT\Ñ\Ì\À\ä\ô\µ\\ƒ\ï\ïŞ¬\Çs\´\€\Ä`\û\Õ\ÜLÕe\êx5&\òEg,\ˆ\İ\âGj\•&1\œq\Š]Q\è}\±Rn\n\¤\“\Ò©\¨\×+\»\ŸJ\‰\æ\ßÑ¸\ \r\r\ã\6\ƒÒšF\ì\ó\Î+88\Æ:Ò¦\Š\å\€Q\×\¨?Íƒ\’x\ı(\ÈİŒg\ëNG\Üs\Œ\ëS\Áj\÷$\•\\*\õv\áE\0T\ú\\ş\•~\Æ\Ö\â;\˜\§\‘\Œ*G3\¥Z\\Ô[\¨{p\“4\œ\úg\§\ó\ª\Ò\ê&\­\¦f\™\3?\ô\ãI>\ÀC\«47r]\c\\ò\î\ã\'Ö¡Ó¤W\³\\\¶Ò§Õƒ\¦\Î\Ö\ísy2B\Ìrw\Nk&\Ü/\›$q\’Ê¬@=\[\¸\åa\ğ\å\ÃFy\\ö\ƒ\Ó9  k\\Õm\Â\é\ÊQ\–vBs\ó\Œ\ô\ô\â\º=QDVvdr>s\ø\ñ&\³\¯\­\Ò\çJxÌ‰Y\‘\·\¹\À@\®Ó³v3\Œ\ÒT\şW\#\¤$\˜\âVl\ŸA\Îj\Z\Õ\0\”\´QT\€-%-ZR\ÒR\Õ \n(\¢\©Z(\¢\©\0QE@9\»az\Ò\´\øY\\³m\\\òGaH\Ø\Şpr3\Á\ÅQ=N\ƒ\Á\×&O\Ê\'\å\•J\ş=k\¸\¯1\Ó\çk{Ø¥S\‚\‡<W\¦\£Eu9V\¸\±+\ŞLp\ì-Q\\ÆEPEPU\¦\Ó\í\'$\Én=\Ç\ô\«4\„\ã\¶M\0GoV\±\â]\«\ú\š\¡\ª\é\×7l\Ò\Át\ñ2\¯È‹\ÜÖ˜\ÏZl\ï\å\Û\Èç¢©?\¥&\æ\á\½{\Ÿ\r\˜\Û&Tm\‡os\Ÿ\—\ü\n\¡<\î\ØM\Ç*1Ïµi\è\Ø0\äoi\È\ô\À\n\êMt2F\’.$Eq\è\Ã5m\Ø[\}<\ë\’NO\¥P\–s\'/\œz\Z\ô\M\¸Ï™h\€\\ë\•\şU\q\á-:\\miS\·dT\ó\\Ç	\ó\»\å:\Jİ±\Õ\æ\¶EG\À\Ïzf\¡mgct`\·\¸\>lm\ük=\™@\á\ÆqT\„Z\¾\Ôæº“{\€q\ÑGj\¯\¡\´c\•\ª\ÆPO\ê&\ä\’1Ö†\À\Ó\¥\CI\«	\©\êØ¬*:Q\Ì:\˜\ïU\€q\ê*t\;|\\?\nä„®A\æ\­E\¨:\õ\ü\úÓº\\›\æ\Á\ó\Í:=\Ìp3Ï¯jÊ²\¿2q\Ó>\§5\©\Èp^\ç\µ0&q\ÿ\0Ö¥\Â\ÿ\0\‘P\½Â†\Àn\ \¦\ı\¤{\ô\¦#\™Ñ£2\êÖ¨\09\pFjïŠ¥\ûW\ˆ\æD\ş\±\ú\?\?\Á\°\¬\š\Ú\È\ÿ\0vg\'Ó·\õ\ªV\‡\íZ\¤\—/\Ğ3J\Ù\ü\ë\'\±a\¬Ë¾\áb\ÎDj\³\é\óHe\™\ä?\ÄsL\¤\€PH9T\©9xf\¡\¢\˜V\ä\†\È\“\ÆO\¤7(y\Ï\û<U*PH9i\ÜE\À\™m\Î\ü\Ğ\Ô\á\Ê\ü\¸;}j\”s\á\<\õe\õ\ù[\¯l\ÓX\å\ÜJ\’O\¥h\Ú\é\ÓÜœ\Ã\§OÎ®h:\ü\\^\‘\\º\§\‚\ß\ıjé§\Ú\Æ\ßs\²\Á\é\Æ3\ô\ØV:\'\—\†\¹>k\ˆ\ê{\Ò\êzÅ–\˜DG\ı\"\ä}\Øc\à\'\×\Ó\ù\ÕyuCV-\›\Ã\àÉœ\õ=\¿\n\›M\ğÍ½\©\ó.1q1\ä\ƒ\÷G\ø\Ñ\ê(P\ÖXK1\ä\‘\¯\Ó\Ô\ÖÕ­\…\µ\Š\˜\€@É–N\£\è;So\µ8,\±\Z4Ã€\‹Â§\ø:\Á\\î\â\é\Ë\ÜÉ»\Ÿ\•TaW\è(\¸X\µ\®M\£\“o\”@re\Á\É\úVW\‡\à\‘\ä\î\Ê\ù\€\\İè½º\\ñ\n\¸Vn\œV\¯\‡\ãSp\¨\ƒ\„R\ZC\«9\—S`\ m\y\õ<\ÿ\0QY\÷\Ùk\£}\ª\®9a\Î0s\š|\ò\¼\×w.y3\Üg\ô\ÅF\Ê\ò|\¤\\´Ç´{h!\¹W\˜\²\²\ã\å/\ì=\³YÂ¥\»\„\Û\İ<G\±\ã\éQÖ‘\Ô\Š(\«@-\”\µhAKIKT\€(\¢\Š\±E%-4EU\ \Š(\ªB$C\ó\æ\½\Ã\Ó\ı\£G\\³\’\£a\ü?\úØ¯9S\Æk\´\ğ\\\û\­f\€\U\ƒ\Ç\ÿ\0\Ô+\Ÿ\Â\ı\„\´\‘\Ñ\ÑE\ÀjQE\0QL\És\…\á{\š\0q<\àu\ {\ûÒ\\Š(\0\ª\º\›\Ó\æ\Á\Á(F}8\ç\ô\«U\™\âX\ô\ö\Ş\á\ˆBO`H\Ï\é\ŸÎ„\®\Á\xb\–\’J\ß\ÄB\\ \ç\ù\“\ùV\Õgh2\¤\º\\f v\†`	\ş.O5\¡\ÇSÒ¥\Œ\rq\ş%\ñ\÷6:|\˜\í#\¯R};\Ä^!\ó\·\ÙØ¾\£\Ê:\Ÿa\ş5\ËC)\·\”KÃ©\È9\äV\Š\º\½É½É’\Â\íËª[\Ê\Ò\'\ŞP9QÖ©0 \à\‚|\ÖÅ¿\‰/\¢\\ä\‘\ÖM\Ã0\Ï\åQ\ës\Û^\˜\î\áQ8Ã \õ\¡İ½XÌ®Ô”QREPE\¹\ã\üh\ñL\ñgcc58\¿\~\ëb\ªQN\ö\ê\êR\ã\æPM/\ö\“\ÿ\0w\õ\ª4Qv+\€~Ë¢j\·\\—\å)\÷<ZÏƒ\÷\ZT\Ò\ÿ\0\¬~\\ëF\\[x&5\ş;\›\Œ\ş?\à+7R\ı\Ô6\ö\£\øssI\(\¢\Š\0(\¢\Š\0(\§\"4\\³\€VÖŸ\¤G%\Ô2s\÷b^\§\ë@\´\Í\"\óRo\ÜE\û\±\÷\¤n~5\Ôiv6\Zk/\–\Ÿl\¸_\½)8\>\™\¨\¯u8\­\í\ÄS\¸\ \0[Xp	\ízVB\ÿ\0h\ë\‡Ê…6\€\ô\è\ƒ\ê{\š\0\İÔ¼U9\\Ğ\›\\\ñ\„S\ì:\š\†\ÏI\¾Ô¦[\ÍffE?v2>f\úÂ¤\Ó\ì,tÑ›tWj>iß„\Şª_\ø\‘m\¤&\Õ\ş\Õs\Ğ\Ì\ßq\İê”¬:Çš\ÛO\µ\Ê\Á\áW\¹\ú\õ\Íj\Ş$y?wy\“\\¿1^ß…s\“]_j\™\'\™\\‰\û\Í\Û\ğ\íN\ƒv]\·\äz\Ò`Y\şÓ„?<J\Š{\æn\îG\«N\ğ\ÄØ\·\¯\¥Gos.\ç\É\ñ@tè‹“+\˜\÷5\Ôh\ƒ\ì\Öw\×\'#Ë\Œ\Ÿb\ \¬{u\n\ª\ c\mc\Ë\ğ\á\\\óq.?\0\ú\ÔJ1\¶$\ç\n\­80$b\™\»?*\ô\÷\¤N7eM0(k\¾tbT_\G\Ì}EbWK5\ÀU\À\ù\«\ò/*bW\”\'\ƒN.\Â \¥\¤\¢\´L\¥\¤\¥\­\‚\Š(\«h\¢\Š\¤!h\¤\¥\ª@QEXEU!^\•\Ñ\ø>}\š\™\‹\´\ˆG\å\Ï\ô\®q>\íi\èSy:\¥\³\ô\À?CÖ¢\¢\¼Z!\è\îz%Q^Y\¸PNh\¦\ı\ö\ÿ\0d~\´\0\˜/\÷\¸_OZ}PEP\\×Œ\ç\Ä0[\ƒ\÷\˜\¹\Ã\ÿ\0\×]-q\ú\°\ş\Ğ\ñ$v\û\¾]ÊŸ\‡S\ıi\­5\£\Ñ\à\û.\‘mq\¶=\Í\ìO\'\ù\×5\â_\´Û­,[\÷]A\ü^Â¬kÚœ\÷o%\•\\á\ä\—\ö\Õ\ÎIi*\¯\Ü\Î=;U\Å(+\½\Ém\½\Œ\æ-\Ç_\­2\­<D%H\ÏN\ø\¨\¥M\¸$\õ\éR\İÊ±N\ÿ\0\ñ\é\Ô\ÿ\0Z\‚\¦ÚŸf\©\Z(\¢\€\n(\¢\€\n(\¢\€\n(\¢\€\n(\¢\€:mN=\ï\£\ØP\ù\\ø\Ÿ\ş\·\ëX7Ò‰\®\¤p;\ÖŞ©&\Û\ûÙº\ˆcH\ÿ\0\ÀFZ\ç)u\0\¢\Š\š\Ú\Ök\§\Ùe\s\ØS\Z\Ğ\Ó\ôÆ¹d\Í\åC\×q\ê~\•f8-\\.nG;A\ùS\ëEÖ¢\‰\İg\”t\î/\ø\Ğ\Ä6\öp\æF:\Ê\ıO\ÓÖ¨É©\Ë$\†+m\Í\Á\\ò\Ç\ü)\°\Ù]j-\ç\İ\ÈR :\·\§\°\«\é%\½\Œ?\è\áQ{\ÊÜ–\úPv\šDq>\ \ÅÜœ\ˆ\Ç$\ıkF\î\ò(T$\Ÿ(r\Ú#\‚~\¾\•\–of\—q\‡(Y\ï\ğ\¨\ãU\O\\\“Ö\\»\š\î\ı\ÈDP\\Ç\Ğ}}MB\"\Š0B.Ò¬d\í\Ï8\ïT\æ\ºH\Á\ò\İ:\ô\ \»\¤h\\\œ};\Õ\™Ø\™9â…Y\Ûq\ÎOsW\¡\T\„U\É\îE\0g\¬X?\¼\È\ÍX\i\ÔD\ \Û\×lX\ì\İ ;\\Ñmi$\ŒXc\€\è(@]\µ\\å?+\¹\îkOT\"8\ìm{Ev\ú\Ÿ\òj\\\ \ó\£\Œ%\œ\\ô\íbà¶­9S\ÂaED1p\¹c\È\õ\ïQK.F\Æ9\ª\Æb\ç\’x\¦o\Ët\ç\é\ÅP\‡.\àVÏ­#F\³\¡V\äN\Ô\Ğ\Ø\ùI\æ\¬D\£iÚ€1n x$\Ú\İ;QQ\Ö\äĞ­\Â`O\¦;VMí¬–W/\¸Ü§\rR`EKH)kh\±-%\ EU!-%-R\0\¢\Š*\-%-R\ô\©\¡%]X\‡5\n\ô$yÈ¦D\P\·\“Î·\_\ï\ o\ÌSê†ƒ/\\£[6y\´\şU\ú\òd\¬\Ú6N\ê\ày\ p(\¢\ÂŠ(\ \Š(\ \n\š\Ù´\·Ü˜\Üzg\ü\ı+\‘\™Ñ¦\“<\Ã!s&y\ç\°\ıkk\Ä3\ÿ\0\¤,@\ğ\ g\ù\ÿ\0\…`du\“Ö®2\å\ÔN7$h\ö\ì8>p1\À\õ\¢y\¥X\Ôd\8\ïZm\¦D-\Õ\¶\ó\Éa\È\úT7Ü«R\¬X\ä\nÏ¸\e m\è{V\Ö›v\„\º5\Ù\ô\ªÈ…	\È\ù\ªoqØ¬\šZ6X\–\0\ã5V(\‰aNH|\ÖÚ\¡8\ëY\°\ü\º\„ÃŒ\î\Í1%\µ\š?\¼\‡\ğ\¨\ˆ#\¨\Åty\É\úTM?\ßQ\ï\Å0\±\Eh\\Ú£Hv\r\€\£\j&\±|\¬=\ZW(\«-e0\ú\Za\¶\›\û\†\˜\ˆh\©\¾\Í6\Ü\ìâ¦¶\¶*\Û\ä\ã\©\\,$v,\È\¸\í\Šw\Ø\ü\ô\•Z\Ş}?J7\ŸOÒ•Ê°\ÍRF\ê\¬~y\\¥\Ä\æ\³\0,p$\ö\©3\ÙI\'\Û|\í\Š0\¾^*\÷\›g\0\é\ö\¾Sm\æi[\§\¿\®}\©\¡\Ği\Ë\‰o\ß\ËN\¢1\÷\›\ü*\Í\İ\ö!\¨\Ğc\ˆ\×\ï\·\øU\¸g\—\šf?\ë\É\üjÒ·\Ñ\ö\bR\™\ç\ÈS\ó\Ÿ\©\í\üéˆ£ioy\©\¿\‘gÈ‡\Ş=}\ØÖ¸\Ó\ô\İ1\Ÿ\ôÛ¾\¤\?Ï©\¦]\ê\¢+q@[@>\ìQ\ğ\Ç\ü\ú\k\n\â\îI\²\£\äO\î\\ÿ\0_Zz\¡}\©\«7\‘\‡G\¿\âj\¼\r\æ\É\æ\Îw\±é‹Y\õ$r2p:H\re\ÇN\«Q\É*Ä½GJ\¥,\ò\ƒ\…\ùsL\‰<\ÇÌ\\ê{\Ğ2Yn$\™\¶\Æ03RAh1\¹\òOaN\\á\Î#\õ\àU\øp\§!w\æ\˜	\¾F[\Ú§c\ÏAA\ó\Œ\0\éP\Ş-I\ŞM%vH\ã\Î\ì\“H\·8>\¤\Õ/\¶\Æ#\¨$v\¦\‘)\Á<v4\Ämhl_S\ÜÄ•\‰Y\ÿ\0!\ş5M\ä\ó$\–BG\ÎÄ9\«\¾U[k\¹\äq\\¡3\ú\Ÿ\åX\Š[\¨\'\“\œQ\Ô}8\ä\ô\'\ŒS\Œ;\È\n\0\ï\éDY\È\È=*pP\·\\œqLD_eP~\\\œ\û\ÓÅº\‚2z\÷\íS\À<\Œ\ô\¡\›<\‘\1ÚoG:\¹\'\Ìyâ¨¼\ù$\–_\¾\ìpqS\ÜÉ²\Í\Ê\çs\\£\ëO\‰p\ˆ\€\0\nKq\œ\õ\Ä[\¾\Ù\Ğ\ö4\Ê\é&\†9\“d\‹\¸\¾\µ\‰yc%\±,h\ûO\­\\ea\è\¤ \Œd\‘\‘K[\©\\AKIKZ \nZJ*\„-QV\€)i)j\\‰\­\Ğ\ÊLj	s\÷@\ïJ\•nÑ¸e8 \äRn\ùh!\£\·\ğ\„\Û\ô\ç\ˆ\õG\Ï\æ?\úÕ»\\\Ÿ\ƒ\'\Å\Ì\ğ\“\÷\Ğ7\â\ÿ\0^\º\Ê\ó\«+M\šA\û\¡EVE\…R3R\Ì@\’M\0)!A$\€$\šÆ‡S:\†\´\¶\ğÇ¼ \»\·\÷\È\à~5\™\â\rd\ÌZ\ŞD#\ï0\ş*\­\ \Ìb[\Ù\»\±c\\ü\ª\Ú\åZ\î%\¨\íN:\âiB{\û\ÿ\0\õ\ª\\š\Á\À\í\ïN\¼\“\å\\“\øt\ª\û\¸\¨l\³F\ÃR\†\ÕB\´g,\Öw\­\¨$\Š\ì\ƒ\‡$v85É¬{\³\¸d\úæ§·\İY\\\‡\¸\¥`7\ï\ï\Ú2\‘\Ê8\'\Ğ\Ö#9w\'<\N\­$\Œ^M\Ìw\Ü\÷\¤\Æ28\¢\Àw\'Ö¨\Æs\©\ËÓ¨\şUx\’G\ÌERU\Ú2g\¾\ÓLF\ƒ\¡\õ\ÅE&s\\Ÿ^\™\§\»r0\¤\ƒ\ïHF\®z\ñ\¤2\r\‡v98\¤i\’MO\‚\œs\éP\„åºŠC\0\à\ÙÏ¦iB\’:\€>\”\ÔRX\ŸÆ¥/#\'\ñ\ÍG S08\ÇcO\ÆG<\ú\\Ô8/\¿\¥\00DXd\ã\ò\¥\ò~\Ÿ\•Y\·\&B\Ä\ô8\©~\Ç\÷\¨\0\«Îª#BrI\'×šÔ²\ğ\õ\ÄÖ¢k\‰Dv\ù\ã\“\×\éU-%\ŸM\œ\²K^\û\—?\¥oË©\Ç%\²\¿\˜n\\¹}ÂŸA	k\²@\€}\ë\‰:\ş}\¿\nÈ½\šI$-n8?;R\İ\\4\Ì\rÌ£\\}Q\š\å4,}\0\Å\0Dl\ål\±m\Ş\õ\´\”u\Ç\çS\†\º\Á(\4C4\ƒç‘³\é@\Á\Å\ƒ\‘WR\ÕU\¾a\Ÿ\­J-ÕˆÚ¹\€S\š\™\¤\ÀQ\ù\n\=\ä \È\Ü{U\èm\’<\¶s\ëS\ü\§hX\·\µ\‚\ßP>\µfF\§\ø\ª\³N\\–\É=\jÏ¸\¾rp\Å04\¤\º\Œ!\æ\³./\·p\¹9$\Ò[\À\÷\¾RU3Ò´eÓ­\¤\…B\ü\¤p\ZW4x\É\\€.s\Ó4\û\»I-\\+\à\ädi \‰\\•\Jw:%e\ğ\¬aI\İ;\–?Ê³``0	}@\­Mg\÷V\šu\¸<\ˆwc\ñ\¬\¡\ÏA\úP\…pT\Üš\r>S\ò\ÕV]\½\ø4\ì\œ|\§\@D\ØP\0\Ï4\å\g\\óß¦j\šÎ¹\òó“Š³j\¢I\ş\ï&\‹\€\\\€\÷\Ã\Ù>c\ÅX\0\0x\æ\©/u4\»\°	\Ú2}?\Ï\éR\Ç&\ğw\\µ`e\‚@l\íJ\ß0\Æ2\Á\¦1ÂƒMA \Ïz`W\¼\°\‰\íBÄŠ\’,=G\§\ù\õ\¬ib\’*\'\¦{\×D0\¤g\æ?\ \«6z{\ê?\º\ÄXp?\ú\ÿ\0Ji\´#\’\Í.Evz\Ÿ\„\­~\Ì\r\¬\Â\Œ\ï!\à\ıMq\Ò\Á$D\‡^=GCZ*\€74\¹\¦\æ\ŒÖªb\šZnisZ)Z)3K\š\´\ÀZz\*:Z\¤\ÄÑµ\áË‘\­\“\Á;}\ø\¯@\¯*\†R\Œ1Ç½zF\|\º\†\Ÿ\Á\p6\È=\ü\ó\\\¸\˜\í \†\\Å\Ú(\ª\÷\·\¶\ö0\™\'p\¾\ƒ\¹\úW\"W4\'\‘\Ò4.\ìGRMrZÖ¸\·\Ç\ùq\ò\ä\ı\ó\ïPjz\’\ê\¸İ½\¼9\â(\ã\ÜH\õ\'\Š\¢\\è\ğ\Æ\›\‚?ç£…\¥i\¤=I\·7\¡\\N\²\Ê#Fgs\ÙFkJ+y\¬l\¦7\´O4\ƒ\åa\ƒ\µG\óju\†\¦\‘\ŞE\ş\‰\ƒ\ü=q\\•k_\¹i\íb\‘\×\Ëgc\\Ô\í\\æj,Ş¥\Ş\Ú\²\Ÿ1\÷\v\Œ\Çj@x\ïJ\¬ Ó·\ø\úÔŒ\\ã(\‰\¾Q\\ŸZVR=F8\ \¦\îA9\ \Ë\ì)\ÜH=GzgÌ£#Ò€FH\àq\Í1\n@\À\À\Á\ª\„\ÿ\0\Ä\Å\ø\ş\j\î\n\õI\²u\0?\é\˜\şt\º\£o\Í<\œ\ò9\íF\Ğ\ÊO\¥4x\şT\€\Bw\Ï#4\Ö\å#\½LWq\À\ê8\¨\Ü}\Ü\i\0n9\à\ç\ó\¦\¯PH\Ó\È\É\Á\À4Î;P\01\¿\¸\Í/\ \é\Ï\ z\Ÿ\­\nH\œq\ĞPl\Š\'d2 \ôÚ\í\ç\³~F\±\äb\ò37Rri\µB\¹\¤l\æ\Ÿ\çf{jo\³\º\¦\ZS\\Ğ \Åy\\0\ŸÂ¥ß¹Ct\'\¥+\Œ\®\±Â¥\”\‚\ÇÕ¹\©\•T.=\…=cE\\\œ\Ô\â\¸\ş\œq\õ\ \Ìg9\'\›@\ÇN;\ú\ÔÏ\¸nI\ g#<\ã\“@\ˆ\ö\«\’0}J\ &J\ñ@\Æï—\Ÿ\ó\Š\†Y\–<o<\\Ô\À\™\¤\äq\j\¥\Å\Ş\Á\„\İ\Ğ\Õ[\‹\“#\‚\¹\Û\Ó\ğ\™\Ï\'$\õ\¤\Ø\Æ\Í+4\„\’	\üé°¸\@\Åwc\µ0\òri)\’k\Å*H\£\Ëa\\à\\”Ñ©\“\n7\±\íÚ²\Á#88\Ï;R\°\Ë`\½\Ã\ù\“6X\ƒ\µsÒ¬[Ç¾\ê%\Ã\Æ*\’\È\Ø\ùG^3\Š\×Ğ£I\µ8\òx$\úU \'\×\Ü>\¬Ñƒ\Ä(\©\Â¨\ôRÖ–\öC5\í\Ä\Äa\¤vn\¾\ÿ\0\ç\ò\¨\ü\§\“\\¹\¡\½D\–\ƒ\·I {\“J\¬H\Â\ä\ô5\n/f\ô)Ü£\0\‘\Ï½!\’DT\¦\Õ:U\¸X\Û\ØM/v\ã\êj\Š\€<.{f\­\Ş[h\¢\Â7\¿×·\ù\ö\¤\û I\ïa\}}jU\—{\ü\ *\–\Å3\€Ts×¥=[\ÊU\Î9\ıj\„\\Rwu\':È¥@\0\îUhX\±\\zt\ä\×A\¦h\Û1=\ğ9\ê\\÷?Z\0\‹L\Ò\Ş\ä\ù\²\“\½\Û\é[\’\Ïk\¦\Ù\îlC\n\ô\«a\Ü\Õ}OS\ƒM\ˆ4\ÅZl|\\©\Æ=Ï \®N\ò\ú[\ù\Œ\·2d\‘\ò\¨\à/\°Iu%\²Ş©\ª\Ï~\Ãd \ü\±\ƒ\ú\ŸST\…V\Îx\¨\ZL\óg\¥5\¤\Õ\’;\Zw\Òy36Ö0a\‚H\šls6\"\”\¯\±\æ\¡H\Ë\ÌNGc\­vZ\Œ\÷)\Œ\ı\Ô?\ÌÒ½\‡c\n	\Ş\ËH\’\¡IPA\\¥d\Şi\·\Ö \›g\Œ\€OC^\‰\ª\ê\Ö\úd?9B>H\‡S\õ\ô\Æ\Ü\ê\·7\²\™&\ù\³Ğ\Š=4\åk\Ü40\óK\š\Ü\Ùo&\l\Š\\ìmÙÈ¿\\ÿ\0\n\¥Q\ \±\\š\\Ö\Ø\í\ó\Ê}jAam\\“Ó©\ªU\‚\ÆVkKH\Õn\´\ùs$\¼\¤d\Z\™,\­Ó“~\´\²_\‹U*\Š\ c\…\¡×¾\–\¸r\ÜÙ—\Ä\÷M\Ä	\Æw7?\\¬+\½Ifm\ÓH\ÒI\X\úU{\‹\ä\‘7\'\Ş\é\ƒYÇ“Y9\öV\Z\âX\å\ÁR\í\¹\'\\ô\ÍcA\È8\«^H\§\ç\ù\‡Z\‚\\­:\Ô\\j\ñ\°K\‚GÒ­\ø\O6\ÿ\0j\ã\£\s\Ï\õ\¤\ğ\®Û‹\·\™r!BxÎª\ßL\³_\Í\'P\\\í\úf\…\³\İ\Ô|\¹<\Ÿ\¥.	\ã\Å!l\¨\ÎG\ñu\ëN\ŞH=p{R(UÃ»\ñ\¤C\ƒ\şE5y<S\”e\Ïzb\·;\Êœ\0\\\ç\úĞ¸*A\Î\¥;\‡\0\\ü\éF\ù\\0\çÒªJ\nß¡9\å1\ô\æ\¯m\ä\æ\©^\°0Ğ‚(B.\ä`f\—h\à\ƒ\Á8\ú\Óc;\£0{Ò–R\À\Œ\ñßµl(\¹\ıiX!Pq\óS1\ƒ\†\ü\é\Ê\0du\Æ}i\0Â¹é‘Ö“!\±\€A\Î967\©\é\ŸJ\‹\‚>Q\Z`(A\Ï \Óv\îl\ã8\«\úu\“\\\È]\ F\ÏV\ö\­Y\ô\¸&\å\±8\Ê\÷?OJ\›\Œ\æ\Z\Ú&bY\œ\õ4\Ÿd\ƒ\şy%mI\£È­\Ë)\Ï9\™\ı\’\ş\£\ş\ú\¢\â1\ŞÍ\\í\œ\ó\‘È©@\‘\‘\ĞU\™\¦\ò\ÇbMT#\’W\i\¥`\¹\\\\¸\Á\§\ı\áÈ¨\Ã\ä\€\í\÷{\Ÿ^Ô¯\´\ô\æ\š\Ê29lHJ\ªr\Ù=\ê<Fp\æ\«\Ï;\´\€)\ô\Í\‰%\¸\ıY<:\¬\Û\ä`KNOZF,qÊ“\œ\é\ïD\…\²\ \\×\'\¥H\ö#u\ÚA\ç>\€\ÒH\ë\;\Š\“jq\ÁbO4yN\Çi$)8\Î:PZ*y\­\İr\Ø\È\­AVHR\Ğ(\ \Æ\Üs\Š\Ú\ğ\ÿ\0\îà¹›\©\µ~\§\ŠÃ­\¨Ù¼<X\ğe\’\š\Ül\¥<\á\®e8Â–\ÀÏµ\Á\'i(\ç5U\³\€H\¤F*\ß/zC\µ\‹e\¸\Ü99\ê$\’aq\†=\Æ:\Šb\£\“\’\Àg\®J\˜\©\nv\àdq\ÇJ\0u\„F\â\á\–<\ä\úb\¦\¸\˜\Íy;q\´\ƒ\ğ\ÿ\0\õ\Óì‰†)n\çbmSU_8$\ã\çÖ’\Ü:\„\00z\SZ\Û\Ë<\Éhdv\ì\µ>\—\§Í¨M\ˆ\Æ\Ô_\¼\í\Ñk\£\·H\­#x4\à\û\ë\‡\ã\ëE\Ä;LÒ£\± \œKu\ë\ü1\ÿ\0\õê¶µ\ât\Ò\Ğ@D×‡\ï7Q\ÿ\0_Ú³5o,P\›=1Û\à\õ>\»Æ¹\ÓgrW\Ì17\¯\¿\ù\æ\­h\"k\«\§\šFyd/+rXóš¬²0\±\ú\æ\›\Ñ\ş|\ä\ZBr1\ùS\¸\¬H\•9<\õ \÷\©\à/# \‰	f\ã\0d\“\íL\´\µ\\ò\å-\íÑ™\›\°\şgÒ»\#H\‡H\‹+\‰\ïrÇ¢})6h\ÚV!n.\ÿ\0ypÜªv_\ñ4\º\ï\ˆc\Ó\ó8\–\ì\ñ\´r#\ú\ú\Ÿj\Ì\Ö\üG\åo\¶\±p\ó$\Ÿ\°\öZ\ç\¢p\§9Ë“\É<\óMwY\ü\û\‰Z[\‡\ó]\I>\¿\áDlrz{T\ˆq\óqM\”\Æ@İ€O\ëM\±\Ê\ä(*p~\i!\»t8\Î\ÿ\0jk+;\†qÚ¡u(\ûXps\ƒŞ\Ë\ét\Œ\Ãv9\Á?Ö­	\ÏOz\Àf\Ëf\¦\Š\îX\ó\ƒ\œ\ú\ÔÕº\¹X\“\'=k\ZY\²=\rJÒ¹f\ëQ\Ğ\ÒQE\0QE\0u\şSk\¢\Ü\İ\ô\É8\ü\øâ¹Ÿ\¶H\²\³.\'\¸\®\šv\û\„\"N\\"\‚\ÿ\0Ö®B\Ÿ@\êiE|\Œ0\ã\¨\äT\âErm\Ô\ó\ŠÆ§#\²\©\Å!\›@\à\óO\2Û‡\¬\ø\¯\˜\°\9\­p\ìv0l(ì§¨\Á\À\ü\êh\ídp8\\§[\À\Ò|\ì~Q\Ó=\ëA\0^\œ\\€?Ï¥M\ÆeÈ§v+\ë\‘Ö©_\‚\'\·\ÿ\0\q]\±\£\®\×_\›\Œ\“\Î+WEYa\Ú\å\ˆl:qBH\Ÿ\êB\ã\ï\´\à>`[\§j\\"\n`\ğp*@G=3\)\€\ÜdrF:ÑŸ\“\+\¯#)F\0\à\ƒ\Í\0\"\\œs\J\ç\è3\x\¥bFq\É<z\Ò\—*8\ëH\r\›MF\"#\…\£X\À\àZ\|\è$\r\‘\ÕG\¿\ù\"\¹XAs\\¾\¤\ñW \[r\¾S\•=\i\Ø.t2L\Ñ\ã\Á\ù\º\Ó>\×/\ü\ô\†\¹\é]d|\Ë\'ÍŒs\éL\Ä?\ó\ÔQa\‹\àp3\ÎE \À\\\\¾\ôÃ¸)i\jÄ™s\Æzf\\†9\ÎÍŸ\—\¡\Ç\éP\Íp\Àc\ƒ\è*\¹/\\€t\è)\¥0\ 1\ë\œÒ¸\nw\™\‚\œ\ñ\ŸJG\Æ\ŞY\¸$`æ‘²\0,\0\ö\ç4\v\±\ä`@\©\…N\ñ\·\·<\Œ\â\\÷\ã\îjp\Œ\–B	\Æ3RÆƒ\I\r\ëLá…°I\ùG\¡\ïVB\\È\â\š2\«\ó\°8\ã8\¥H\Ï#\ë@\rp#p\Á\ë\ŠÎš3\‘\Ô\n\ÔİŒ}j\µ\ÊS\Ÿ\¿\ÔSBe\n)H\Á \ö\ u\ª$+_T\ıÖ›iC\³q\ú\Ö\\\¾xĞŒ\î`?Z\½\¯Éº\ÿ\0`<F\¡h\œMJ\²F\ª\Ü\ärj%\œT\Í\Z\"\‚yb8\´\€tM\½\‚\ç\é\\ÿ\0Z\°q\´g\ô\ªv\ÿ\0\ë\†+B\‹\Î\É\Á\¦\ó\ş\ê\Î\¹%Ï˜\Ã\Ø\‘V\ô\Í(Ü>å¼¸ç­\ì*K$\·\’\æ{\»\œ4p\‘k\\¤rj\Å\í\â[\ \š\üa1\û\«a\Áo\¯\ \©\Ø\’\\D\¶\¹\Ş-,#\ãp\ê\ç\Ğz\š\æ\õ-Z}Gm\¥\œf`p\±\©\å\½\Ø\ú\ÕCQ\¸Ô§\İ3a\n\ƒ\…A\íPD\ŞT\\‰\Æ=*\’\î5\í4\¿\"%\–E\İ)\ìz/k!Oq\ŸÒ©Zj\À\ånNG@@\çf\ö\ê(\¢)Vb2\£\û\Ü\ÿ\0\ú\è\ı\´/\›!zn5GI\Ò\îuK\‘\º\áG\Şs\ÑE[\Ót\ë\­fA,\ò\íT\ü\ÎGE\Ít\í=\­\…\\—o\‹kD\û\Ï\üN}\©\ 	\¬-\­4\˜ZR\£3\\7\ø\×9\¯\ø\ˆ\Ü\´\°% \è\ò\Ÿ\à*\†\¯\¬I\û\¨\Á\Š\ÕzF_s\êk.\€T\‘Ë·\ï\0{j\Š\Šw\è\™Uq\“Ó\éL\Œ\‡\\–<\ã#\'\Š\¬#5,N\‹\€G~sN\â-\Ä6\©\'\ \êjÔ²\\œ\ô\¤D\"`{\š\‰\¥i3\¼\õ\ì(\Üdt\”QREPEPO\…<É‘1\\Ì2\´|=\Ú5\»T#+\¿s}4\³\ã	<\¨ \´V\ùWA\\æ+\•\­\\Üy\ú\\Ğg\ñ5\M\€QE\€)\Èì¹N\r6\Š\0ÓµÕ¤\ˆ\€\ü\\­mZ\ê\‘M\Ğ\ä\Ÿ^\Õ\ÉR\«2ò¤¡\¥a\Ü\ìg\º\n\‡\Ë9\'\¸?\ç\šÆ¿\ÎØ‰\ë\æ\Œ\ç\¯9\ª\ßH\ƒk\Œ\õ\«3N&\Š\"8\dP.D7B\ \ğ;Ô¹\Ø~c\íQ[\í\Ú22:\š\(\à\Ÿ\¼{zP08?0\È\ô\¥T/\´\†$u\·\0\Ò\‡nhx\ƒH\±\î\ÈVÊh \ï\0s\\õ2 U\Æ2G\\P\ãU\n}\‡&\•9\Ë\ŸJUc\Üg\úSX\ä`3Ú˜pq\œÂ“z\ú/\ı\óI\‚I\Ã0Ô›[\û\Ï@\Œ\éØª:\ç@\±b7rK`\š\»s\ş\¬\¼*\ˆ\ê\¿\ïT1\’H\Š6\¨\­,\ƒ\Œd\ã4\²}\ä\¢N\¿\1\±\©\Î\Ğ{\š\°#_0q\\›\µW\\ø>\µh\¬\ïT\ŒG\ù[\¡\åPNi\’\ı\ñ\ô\©\˜\„\ÉP\0\ıi\È7F	\ëL~\Ô\ø\¿\ÕÆ€#rG\ì\æ\‘~c\·,\ëÉ¥~\¿\ğ\ZH\ş\ì\î\Ó\…Ê…\”\ã\½F9\©n\¿\Ö\ÔKO\ \º\–\´\¥\r\©\ÀMÔš\›\Ô&\'\û\Ô\í#\şB\\½\ı)\š\\ü\Í\ş\ñ\¦I\nw\«)\ÌlOQ\œUT\ïV\£\ÿ\0T\ÿ\0\.\¥-\Š\È\Ä8a×­o\ØD\‚\Ø\\c\÷\‡<\şÏ¯_Âº;/\ù/\ü\ùP\ÄI\¥+F\š\ó\å\‹%7\ò<\ç\µ\Í\Ü\ÜMu3K<\…İº\“]\‡\ü\Š\÷_\…r\ô b\ƒ\ŠJ(\¦!kOG\/5(b\Ÿ%	\äY\\«_\Ã\ò\ƒ\êh{Ò\Zx\í\À\n\ä^j\äu{\Ùî®%o\’6*\ˆ\€k\¯_\ø\ÿ\0_\øq\¿\ñ\ù?\ıto\çB\n(\¢\€\n(\¢\€\nS\Æ))OA\ô\  a}\é\0\ËN=\éH\¿|}E0ER\0\¢\Š(\0\¢\Š(\0\­\Ï	\\öÛ‡\ÇÌ9S\é\Á\¬:\İ\ğ\Ÿ\ü}]×»\ÿ\0*\0\Ì\Ô\É:\„\Ù\ş\õU\«:\—\ü\Í\ş\õV\ \Š(\ \Š(\ \Š(\ \¦\‹\î\\÷\ÅCSC\÷\ıt\r\Z\Ğ\¯\"\\›\ñS\¸@\ëPE\ş\ºO\ú\éS/\İ_\¯\õ\¤1rI\ş\ö)Ì \î\È\Î)\\Ç\û\õ!\ê\Ô\0\¯\Z\”\¡\õ,|\ª\ä\ç\§\ëM?\ê\Å:/\º\¿\ğ\Z\$\«q\ï\×\ëP\ä\ïbz\ò*W\ûßŸ\ó\¨{\Ÿ\©\¡r\Ü~\î\¥\ÅGo\ş\®\¤\ G\ÿ\Ù', 'nice_wu')\G

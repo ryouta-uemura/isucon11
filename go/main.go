@@ -754,6 +754,10 @@ func getIsuID(c echo.Context) error {
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
 	var res Isu
+	// 一件改善できなそうに見えるこのクエリーがやたら重たい, 画像かな
+	// schema側でINVISIBLEを付与してみた -> 時間は半分くらいに, あとは整合性エラーが出るのかと思ったが出なかった
+	// ここで要求されてるレスポンスはなんなんだ？どこかに定義されているのか？？
+	// このレスポンスの省略は, 合法なのか？
 	err = db.Get(&res, "SELECT * FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 		jiaUserID, jiaIsuUUID)
 	if err != nil {
@@ -1063,6 +1067,24 @@ func getIsuConditions(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "missing: jia_isu_uuid")
 	}
 
+
+	// 認可的な役目を果たしているクエリー
+	// アーリーリターンに役立つと思うので先にこれを実行するようにしてみる
+	// TODO: この処理がいろんなところで頻発する, (jia_isu_uuid と jia_user_idのペアの確認, これをどこかに切り出したい)
+        var isuName string
+        err = db.Get(&isuName,
+                "SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
+                jiaIsuUUID, jiaUserID,
+        )
+        if err != nil {
+                if errors.Is(err, sql.ErrNoRows) {
+                        return c.String(http.StatusNotFound, "not found: isu")
+                }
+
+                c.Logger().Errorf("db error: %v", err)
+                return c.NoContent(http.StatusInternalServerError)
+        }
+
 	endTimeInt64, err := strconv.ParseInt(c.QueryParam("end_time"), 10, 64)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "bad format: end_time")
@@ -1085,20 +1107,6 @@ func getIsuConditions(c echo.Context) error {
 			return c.String(http.StatusBadRequest, "bad format: start_time")
 		}
 		startTime = time.Unix(startTimeInt64, 0)
-	}
-
-	var isuName string
-	err = db.Get(&isuName,
-		"SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
-		jiaIsuUUID, jiaUserID,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.String(http.StatusNotFound, "not found: isu")
-		}
-
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	conditionsResponse, err := getIsuConditionsFromDB(db, jiaIsuUUID, endTime, conditionLevel, startTime, conditionLimit, isuName)

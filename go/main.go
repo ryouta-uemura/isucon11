@@ -61,7 +61,7 @@ var (
 	trendCacheMu      sync.RWMutex
 	trendCacheVersion uint64
 	trendCache        []TrendResponse
-
+	trendCacheBuildMu sync.Mutex
 )
 
 func getTrendCache() ([]TrendResponse, uint64, bool) {
@@ -1255,6 +1255,14 @@ func getTrend(c echo.Context) error {
 	if cacheTrend, _, ok := getTrendCache(); ok {
 		return c.JSON(http.StatusOK, cacheTrend) // cacheがあればそれを返してしまう
 	}
+
+	trendCacheBuildMu.Lock() // cacheがinvalidateされた際にいろんなクライアントのリクエストで同時に更新が走り負荷が爆発する現象 (cache stampedeを防ぐ)
+	defer trendCacheBuildMu.Unlock()
+
+	if cacheTrend, _, ok := getTrendCache(); ok {
+		return c.JSON(http.StatusOK, cacheTrend) // cacheがあればそれを返してしまう
+	}
+
 	cacheVersion := getTrendCacheVersion()
 
 	res := []TrendResponse{}

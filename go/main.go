@@ -300,7 +300,7 @@ func main() {
 	// e.Debug = true // JSONをpretty printする設定, return c.JSONのところで時間食ってそうと思ってたが、そのうちの60%くらいをpretty print処理にくっていそうだった
 	e.Logger.SetLevel(log.ERROR)
 
-	e.Use(middleware.Logger()) // 結構CPUを奪われているらしい. by pprof
+	//e.Use(middleware.Logger()) // 結構CPUを奪われているらしい. by pprof
 	// 実際これを無くしたら, スコアが35k -> 38kへ, しかし, エラーが頻発してスコアが０になった. 負荷に耐えられなくなった. DBボトルネック?
 	e.Use(middleware.Recover())
 

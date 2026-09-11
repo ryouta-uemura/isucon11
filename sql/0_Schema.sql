@@ -3,6 +3,8 @@ DROP TABLE IF EXISTS `isu_condition`;
 DROP TABLE IF EXISTS `isu`;
 DROP TABLE IF EXISTS `user`;
 
+DROP TABLE IF EXISTS latest_isu_condition;
+
 CREATE TABLE `isu` (
   `id` bigint AUTO_INCREMENT,
   `jia_isu_uuid` CHAR(36) NOT NULL UNIQUE,
@@ -29,6 +31,16 @@ CREATE TABLE `isu_condition` (
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 
 ALTER TABLE isu_condition ADD INDEX idx (jia_isu_uuid, timestamp);
+
+CREATE TABLE `latest_isu_condition` (
+	`jia_isu_uuid` CHAR(36) NOT NULL,
+        `timestamp` DATETIME NOT NULL,
+        `is_sitting` TINYINT(1) NOT NULL,
+        `condition` VARCHAR(255) NOT NULL,
+        `level` VARCHAR(8) NOT NULL,
+        `message` VARCHAR(255) NOT NULL,
+        PRIMARY KEY(`jia_isu_uuid`)
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 
 CREATE TABLE `user` (
   `jia_user_id` VARCHAR(255) PRIMARY KEY,

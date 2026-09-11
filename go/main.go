@@ -533,17 +533,31 @@ func getIsuList(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	tx, err := db.Beginx()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+	type IsuListRow struct {
+		ID              int            `db:"id"`
+		JIAIsuUUID      string         `db:"jia_isu_uuid"`
+		Name            string         `db:"name"`
+		Character       string         `db:"character"`
+		LatestTimestamp sql.NullTime   `db:"latest_timestamp"`
+		LatestIsSitting sql.NullBool   `db:"latest_is_sitting"`
+		LatestCondition sql.NullString `db:"latest_condition"`
+		LatestLevel     sql.NullString `db:"latest_level"`
+		LatestMessage   sql.NullString `db:"latest_message"`
 	}
-	defer tx.Rollback()
-
-	isuList := []Isu{}
-	err = tx.Select(
+	isuList := []IsuListRow{}
+	err = db.Select(
 		&isuList,
-		"SELECT * FROM `isu` WHERE `jia_user_id` = ? ORDER BY `id` DESC",
+		"SELECT i.id, i.jia_isu_uuid, i.name, i.`character`, "+
+			" l.timestamp as latest_timestamp,"+
+			" l.is_sitting as latest_is_sitting,"+
+			" l.`condition` as latest_condition,"+
+			" l.level as latest_level,"+
+			" l.message as latest_message"+
+			" FROM `isu` i "+
+			" LEFT JOIN latest_isu_condition l"+
+			" ON l.jia_isu_uuid = i.jia_isu_uuid"+
+			" WHERE i.jia_user_id = ?"+
+			" ORDER BY i.id DESC",
 		jiaUserID)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
@@ -553,29 +567,16 @@ func getIsuList(c echo.Context) error {
 	responseList := []GetIsuListResponse{}
 
 	for _, isu := range isuList {
-		var lastCondition IsuCondition
-		foundLastCondition := true
-		err = tx.Get(&lastCondition, "SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` DESC LIMIT 1",
-			isu.JIAIsuUUID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				foundLastCondition = false
-			} else {
-				c.Logger().Errorf("db error: %v", err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-		}
-
 		var formattedCondition *GetIsuConditionResponse
-		if foundLastCondition {
+		if isu.LatestTimestamp.Valid {
 			formattedCondition = &GetIsuConditionResponse{
-				JIAIsuUUID:     lastCondition.JIAIsuUUID,
+				JIAIsuUUID:     isu.JIAIsuUUID,
 				IsuName:        isu.Name,
-				Timestamp:      lastCondition.Timestamp.Unix(),
-				IsSitting:      lastCondition.IsSitting,
-				Condition:      lastCondition.Condition,
-				ConditionLevel: lastCondition.Level,
-				Message:        lastCondition.Message,
+				Timestamp:      isu.LatestTimestamp.Time.Unix(),
+				IsSitting:      isu.LatestIsSitting.Bool,
+				Condition:      isu.LatestCondition.String,
+				ConditionLevel: isu.LatestLevel.String,
+				Message:        isu.LatestMessage.String,
 			}
 		}
 
@@ -586,12 +587,6 @@ func getIsuList(c echo.Context) error {
 			Character:          isu.Character,
 			LatestIsuCondition: formattedCondition}
 		responseList = append(responseList, res)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	return c.JSON(http.StatusOK, responseList)
@@ -1217,10 +1212,10 @@ func getTrend(c echo.Context) error {
 	res := []TrendResponse{}
 
 	type TrendRow struct {
-		ID        int       `db:"id"`
-		Character string    `db:"character"`
-		Timestamp sql.NullTime `db:"timestamp"` // nullな場合もあり得る. latest_conditionがないisuについて
-		Level     sql.NullString    `db:"level"`
+		ID        int            `db:"id"`
+		Character string         `db:"character"`
+		Timestamp sql.NullTime   `db:"timestamp"` // nullな場合もあり得る. latest_conditionがないisuについて
+		Level     sql.NullString `db:"level"`
 	}
 
 	var trendRows []TrendRow
@@ -1247,13 +1242,12 @@ func getTrend(c echo.Context) error {
 			byCharacter[trendRow.Character] = tr
 		}
 
-
 		if !trendRow.Timestamp.Valid || !trendRow.Level.Valid {
 			continue
 		}
 		tc := &TrendCondition{
 			ID:        trendRow.ID,
-		        Timestamp: trendRow.Timestamp.Time.Unix(),
+			Timestamp: trendRow.Timestamp.Time.Unix(),
 		}
 		switch trendRow.Level.String {
 		case "info":

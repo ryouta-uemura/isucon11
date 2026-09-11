@@ -17,7 +17,9 @@ CREATE TABLE `isu` (
    PRIMARY KEY(`id`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;
 
+
 ALTER TABLE isu ADD INDEX character_idx (`character`);
+ALTER TABLE isu ADD INDEX user_idx (`jia_user_id`);
 
 CREATE TABLE `isu_condition` (
   `id` bigint AUTO_INCREMENT,

@@ -1,0 +1,6 @@
+HTTP/2 200 
+server: nginx/1.18.0 (Ubuntu)
+date: Sat, 12 Sep 2026 04:38:50 GMT
+content-type: application/json; charset=UTF-8
+vary: Accept-Encoding
+

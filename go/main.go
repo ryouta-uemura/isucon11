@@ -28,6 +28,7 @@ import (
 	_ "net/http/pprof"
 	"path/filepath"
 	"sync"
+	"net"
 )
 
 const (
@@ -223,8 +224,13 @@ func getEnv(key string, defaultValue string) string {
 
 func NewMySQLConnectionEnv() *MySQLConnectionEnv {
 	return &MySQLConnectionEnv{
-		Host:     getEnv("MYSQL_HOST", "127.0.0.1"),
-		Port:     getEnv("MYSQL_PORT", "3306"),
+		//Host:     getEnv("MYSQL_HOST", "127.0.0.1"),
+		//Port:     getEnv("MYSQL_PORT", "3306"),
+		//User:     getEnv("MYSQL_USER", "isucon"),
+		//DBName:   getEnv("MYSQL_DBNAME", "isucondition"),
+		//Password: getEnv("MYSQL_PASS", "isucon"),
+		Host: "/run/mysqld/mysqld.sock",
+		//Port:     getEnv("MYSQL_PORT", "3306"),
 		User:     getEnv("MYSQL_USER", "isucon"),
 		DBName:   getEnv("MYSQL_DBNAME", "isucondition"),
 		Password: getEnv("MYSQL_PASS", "isucon"),
@@ -232,7 +238,8 @@ func NewMySQLConnectionEnv() *MySQLConnectionEnv {
 }
 
 func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
-	dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Host, mc.Port, mc.DBName) // driverにてSQLパラメータの埋め込みを試してみる, logにPREPAREが非常に多いから (理解不十分)
+	//dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Host, mc.Port, mc.DBName) // driverにてSQLパラメータの埋め込みを試してみる, logにPREPAREが非常に多いから (理解不十分)
+	dsn := fmt.Sprintf("%v:%v@unix(%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Host, mc.DBName) // driverにてSQLパラメータの埋め込みを試してみる, logにPREPAREが非常に多いから (理解不十分)
 	return sqlx.Open("mysql", dsn)
 }
 
@@ -359,8 +366,21 @@ func main() {
 		http.ListenAndServe(":6060", nil)
 	}()
 
-	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
-	e.Logger.Fatal(e.Start(serverPort))
+	socketPath := "/tmp/isucondition.sock"
+	_ = os.Remove(socketPath)
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		e.Logger.Fatal("failed to listen unix socket: %v", err)
+	}
+	if err := os.Chmod(socketPath, 0666); err != nil {
+		e.Logger.Fatalf("failed to chmod unix socket: %v", err)
+	}
+
+	server := &http.Server{
+		Handler: e,
+	}
+	// serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
+	e.Logger.Fatal(server.Serve(listener))
 }
 
 func getSession(r *http.Request) (*sessions.Session, error) {
@@ -1266,7 +1286,6 @@ func getTrend(c echo.Context) error {
 	cacheVersion := getTrendCacheVersion()
 
 	res := []TrendResponse{}
-
 
 	type TrendRow struct {
 		ID        int            `db:"id"`

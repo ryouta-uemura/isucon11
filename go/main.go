@@ -1533,9 +1533,10 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	var result sql.Result
 	if latest != nil {
 		// 普通のinsertだと主キーの重複で落ちる, ON DUPLICATE KEY UPDATEだと, もしなければ書き込み、あれば更新してくれるらしい
-		_, err = tx.NamedExec(`
+		result, err = tx.NamedExec(`
   		INSERT INTO latest_isu_condition
   			(jia_isu_uuid, timestamp, is_sitting, `+"`condition`"+`, level, message)
   		VALUES
@@ -1559,7 +1560,11 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	invalidateTrendCache()
+	affected, err := result.RowsAffected()
+	// 必ず書き込むのではなく, 更新があった時のみにする
+	if err != nil && affected > 0 {
+		invalidateTrendCache()
+	}
 	return c.NoContent(http.StatusAccepted)
 }
 

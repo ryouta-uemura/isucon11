@@ -1562,7 +1562,8 @@ func postIsuCondition(c echo.Context) error {
 
 	affected, err := result.RowsAffected()
 	// 必ず書き込むのではなく, 更新があった時のみにする
-	if err != nil && affected > 0 {
+	// if err != nil && affected > 0 { // 実はこれでスコアが伸びてしまったのだが、これは重大な誤り, errがある場合はcache更新すべきタイミングではない(少なくともアプリの論理的には)
+	if err == nil && affected > 0 {
 		invalidateTrendCache()
 	}
 	return c.NoContent(http.StatusAccepted)

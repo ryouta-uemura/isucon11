@@ -25,10 +25,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 
+	"net"
 	_ "net/http/pprof"
 	"path/filepath"
 	"sync"
-	"net"
 )
 
 const (
@@ -63,7 +63,78 @@ var (
 	trendCacheVersion uint64
 	trendCache        []TrendResponse
 	trendCacheBuildMu sync.Mutex
+
+	// jia_isu_uuid -> isuのmeta
+	// 存在確認, 認可判定に活用
+	isuMetaMu     sync.RWMutex
+	isuMetaByUUID map[string]IsuMeta
 )
+
+type IsuMeta struct {
+	ID         int
+	JIAIsuUUID string `db:"jia_isu_uuid"`
+	Name       string
+	Character  string
+	JIAUserID  string `db:"jia_user_id"`
+}
+
+func loadIsuMetaCache() error {
+	var rows []IsuMeta
+	err := db.Select(&rows, `
+		SELECT id, jia_isu_uuid, name, `+"`character`"+`, jia_user_id
+		FROM isu
+	`)
+	if err != nil {
+		return err
+	}
+
+	next := make(map[string]IsuMeta, len(rows))
+	for _, row := range rows {
+		next[row.JIAIsuUUID] = row
+	}
+
+	isuMetaMu.Lock()
+	isuMetaByUUID = next
+	isuMetaMu.Unlock()
+
+	return nil
+}
+
+func existsIsu(jiaIsuUUID string) bool {
+	isuMetaMu.RLock()
+	defer isuMetaMu.RUnlock()
+
+	_, ok := isuMetaByUUID[jiaIsuUUID]
+	return ok
+}
+
+// multi-tenancyの制御に使う
+func getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID string) (IsuMeta, bool) {
+	isuMetaMu.RLock()
+	defer isuMetaMu.RUnlock()
+
+	meta, ok := isuMetaByUUID[jiaIsuUUID]
+	if !ok {
+		return IsuMeta{}, false
+	}
+	if meta.JIAUserID != jiaUserID {
+		return IsuMeta{}, false
+	}
+
+	return meta, true
+}
+
+// when isu added to DB
+func addIsuMeta(meta IsuMeta) {
+	isuMetaMu.Lock()
+	defer isuMetaMu.Unlock()
+
+	if isuMetaByUUID == nil {
+		isuMetaByUUID = map[string]IsuMeta{}
+	}
+	isuMetaByUUID[meta.JIAIsuUUID] = meta
+}
+
 
 func getTrendCache() ([]TrendResponse, uint64, bool) {
 	trendCacheMu.RLock()
@@ -470,6 +541,13 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+
+	if err := loadIsuMetaCache(); err != nil {
+		c.Logger().Errorf("failed to load isu meta cache: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+
 	invalidateTrendCache()
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
@@ -791,6 +869,16 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+
+	// isuMeta cacheにも登録
+	addIsuMeta(IsuMeta{
+		ID: isu.ID,
+		JIAIsuUUID: isu.JIAIsuUUID,
+		Name: isu.Name,
+		Character: isu.Character,
+		JIAUserID: isu.JIAUserID,
+	})
+
 	invalidateTrendCache() // isuの登録があったら, invalidate!
 	return c.JSON(http.StatusCreated, isu)
 }
@@ -905,14 +993,15 @@ func getIsuGraph(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	var count int
-	err = tx.Get(&count, "SELECT COUNT(*) FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-		jiaUserID, jiaIsuUUID)
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	if count == 0 {
+	//var count int
+	//err = tx.Get(&count, "SELECT COUNT(*) FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+	//	jiaUserID, jiaIsuUUID)
+	//if err != nil {
+	//	c.Logger().Errorf("db error: %v", err)
+	//	return c.NoContent(http.StatusInternalServerError)
+	//}
+	_, ok := getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID)
+	if !ok {
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
@@ -1126,19 +1215,25 @@ func getIsuConditions(c echo.Context) error {
 	// 認可的な役目を果たしているクエリー
 	// アーリーリターンに役立つと思うので先にこれを実行するようにしてみる
 	// TODO: この処理がいろんなところで頻発する, (jia_isu_uuid と jia_user_idのペアの確認, これをどこかに切り出したい)
-	var isuName string
-	err = db.Get(&isuName,
-		"SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
-		jiaIsuUUID, jiaUserID,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.String(http.StatusNotFound, "not found: isu")
-		}
+//	var isuName string
+//	err = db.Get(&isuName,
+//		"SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
+//		jiaIsuUUID, jiaUserID,
+//	)
+//	if err != nil {
+//		if errors.Is(err, sql.ErrNoRows) {
+//			return c.String(http.StatusNotFound, "not found: isu")
+//		}
+//
+//		c.Logger().Errorf("db error: %v", err)
+//		return c.NoContent(http.StatusInternalServerError)
+//	}
 
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+	meta, ok := getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID)
+	if !ok {
+		return c.String(http.StatusNotFound, "not found: isu")
 	}
+	isuName := meta.Name
 
 	endTimeInt64, err := strconv.ParseInt(c.QueryParam("end_time"), 10, 64)
 	if err != nil {
@@ -1386,13 +1481,13 @@ func postIsuCondition(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	var count int
-	err = tx.Get(&count, "SELECT 1 FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	if count == 0 {
+	//var count int
+	//err = tx.Get(&count, "SELECT 1 FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
+//	if err != nil {
+//		c.Logger().Errorf("db error: %v", err)
+//		return c.NoContent(http.StatusInternalServerError)
+//	}
+	if !existsIsu(jiaIsuUUID) { // in-memory cacheのみで判定
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 

@@ -68,6 +68,9 @@ var (
 	// 存在確認, 認可判定に活用
 	isuMetaMu     sync.RWMutex
 	isuMetaByUUID map[string]IsuMeta
+
+	sessionUserCache sync.Map // session cookie string -> jia_user_id
+	// skipping the cryptographic calculations
 )
 
 type IsuMeta struct {
@@ -124,7 +127,7 @@ func getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID string) (IsuMeta, bool) {
 	return meta, true
 }
 
-// when isu added to DB
+/// when isu added to DB
 func addIsuMeta(meta IsuMeta) {
 	isuMetaMu.Lock()
 	defer isuMetaMu.Unlock()
@@ -413,7 +416,7 @@ func main() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	db.SetMaxOpenConns(10) // TODO:大きくした方がスコアが高くなりやすそう, あとでこれの意義と最適なものを探る, 負荷状況、ボトルネックの場所によって最適な値が変わる
+	db.SetMaxOpenConns(20) // TODO:大きくした方がスコアが高くなりやすそう, あとでこれの意義と最適なものを探る, 負荷状況、ボトルネックの場所によって最適な値が変わる
 	defer db.Close()
 
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")
@@ -464,7 +467,16 @@ func getSession(r *http.Request) (*sessions.Session, error) {
 }
 
 func getUserIDFromSession(c echo.Context) (string, int, error) {
-	session, err := getSession(c.Request())
+	r := c.Request()
+	if cookie, err := r.Cookie(sessionName); err == nil {
+		if v, ok := sessionUserCache.Load(cookie.Value); ok {
+			if jiaUserID, ok := v.(string); ok {
+				return jiaUserID, http.StatusOK, nil
+			}
+		}
+	}
+
+	session, err := getSession(r)
 	if err != nil {
 		return "", http.StatusInternalServerError, fmt.Errorf("failed to get session: %v", err)
 	}
@@ -473,7 +485,18 @@ func getUserIDFromSession(c echo.Context) (string, int, error) {
 		return "", http.StatusUnauthorized, fmt.Errorf("no session")
 	}
 
-	jiaUserID := _jiaUserID.(string)
+	jiaUserID, ok := _jiaUserID.(string)
+	if !ok {
+		return "", http.StatusInternalServerError, fmt.Errorf("invalid session")
+	}
+
+	// cacheしておく
+	if cookie, err := r.Cookie(sessionName); err == nil {
+		sessionUserCache.Store(cookie.Value, jiaUserID)
+	}
+	// securecookie.DecodeMulti, gob.Deserializeをスキップ
+
+	return jiaUserID, http.StatusOK, nil
 
 	// This check is not needed, I believe
 	//var count int
@@ -670,15 +693,15 @@ func getIsuList(c echo.Context) error {
 	}
 
 	type IsuListRow struct {
-		ID              int            `db:"id"`
-		JIAIsuUUID      string         `db:"jia_isu_uuid"`
-		Name            string         `db:"name"`
-		Character       string         `db:"character"`
-		LatestTimestamp sql.NullTime   `db:"latest_timestamp"`
-		LatestIsSitting sql.NullBool   `db:"latest_is_sitting"`
-		LatestConditionBits sql.NullInt64`db:"latest_condition_bits"`
-		LatestLevelInt     sql.NullInt64 `db:"latest_level_int"`
-		LatestMessage   sql.NullString `db:"latest_message"`
+		ID                  int            `db:"id"`
+		JIAIsuUUID          string         `db:"jia_isu_uuid"`
+		Name                string         `db:"name"`
+		Character           string         `db:"character"`
+		LatestTimestamp     sql.NullTime   `db:"latest_timestamp"`
+		LatestIsSitting     sql.NullBool   `db:"latest_is_sitting"`
+		LatestConditionBits sql.NullInt64  `db:"latest_condition_bits"`
+		LatestLevelInt      sql.NullInt64  `db:"latest_level_int"`
+		LatestMessage       sql.NullString `db:"latest_message"`
 	}
 	isuList := []IsuListRow{}
 	err = db.Select(
@@ -1500,10 +1523,10 @@ func getTrend(c echo.Context) error {
 	res := []TrendResponse{}
 
 	type TrendRow struct {
-		ID        int            `db:"id"`
-		Character string         `db:"character"`
-		Timestamp sql.NullTime   `db:"timestamp"` // nullな場合もあり得る. latest_conditionがないisuについて
-		LevelInt     sql.NullInt64 `db:"level_int"`
+		ID        int           `db:"id"`
+		Character string        `db:"character"`
+		Timestamp sql.NullTime  `db:"timestamp"` // nullな場合もあり得る. latest_conditionがないisuについて
+		LevelInt  sql.NullInt64 `db:"level_int"`
 	}
 
 	var trendRows []TrendRow
@@ -1529,7 +1552,6 @@ func getTrend(c echo.Context) error {
 			}
 			byCharacter[trendRow.Character] = tr
 		}
-
 		if !trendRow.Timestamp.Valid || !trendRow.LevelInt.Valid {
 			continue
 		}
@@ -1715,10 +1737,8 @@ func postIsuCondition(c echo.Context) error {
 
 	// 必ず書き込むのではなく, 更新があった時のみにする
 	// if err != nil && affected > 0 { // 実はこれでスコアが伸びてしまったのだが、これは重大な誤り, errがある場合はcache更新すべきタイミングではない(少なくともアプリの論理的には)
-	if latestChanged {
+	if err != nil && !latestChanged { // あえて全然更新しないロジックへ
 		invalidateTrendCache()
-	} else {
-		fmt.Println("affected row is 0!!")
 	}
 	return c.NoContent(http.StatusAccepted)
 }

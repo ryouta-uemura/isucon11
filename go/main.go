@@ -198,9 +198,9 @@ type IsuCondition struct {
 	JIAIsuUUID    string    `db:"jia_isu_uuid"`
 	Timestamp     time.Time `db:"timestamp"`
 	IsSitting     bool      `db:"is_sitting"`
-	Condition     string    `db:"condition"`
+//	Condition     string    `db:"condition"`
 	ConditionBits int       `db:"condition_bits"`
-	Level         string    `db:"level"`
+//	Level         string    `db:"level"`
 	LevelInt      int       `db:"level_int"`
 	Message       string    `db:"message"`
 	CreatedAt     time.Time `db:"created_at"`
@@ -1145,11 +1145,6 @@ func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, erro
 	sittingCount := 0
 
 	for _, condition := range isuConditions {
-		// 多分このチェックも不要になるかなぁ,すでにしてるはずなので
-		if !isValidConditionFormat(condition.Condition) {
-			return GraphDataPoint{}, fmt.Errorf("invalid condition format")
-		}
-
 		if condition.ConditionBits&^7 != 0 {
 			return GraphDataPoint{}, fmt.Errorf("invalid condition level")
 		}
@@ -1284,11 +1279,11 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	conditionLevels := []int{}
 	for level := range conditionLevel {
 		switch level {
-		case "info" :
+		case "info":
 			conditionLevels = append(conditionLevels, 0)
-		case "warning" :
+		case "warning":
 			conditionLevels = append(conditionLevels, 1)
-		case "critical" :
+		case "critical":
 			conditionLevels = append(conditionLevels, 2)
 		}
 	}
@@ -1331,8 +1326,8 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 			IsuName:        isuName,
 			Timestamp:      c.Timestamp.Unix(),
 			IsSitting:      c.IsSitting,
-			Condition:      c.Condition,
-			ConditionLevel: c.Level,
+			Condition:      conditionStringFromBits(c.ConditionBits),
+			ConditionLevel: levelStringFromInt(c.LevelInt),
 			Message:        c.Message,
 		}
 		conditionsResponse = append(conditionsResponse, &data)
@@ -1385,6 +1380,29 @@ func parseConditionBits(conditionStr string) (bits int, level string, levelInt i
 		return bits, conditionLevelCritical, 2, true
 	default:
 		return 0, "", 0, false
+	}
+}
+
+func conditionStringFromBits(bits int) string {
+	return fmt.Sprintf(
+		"is_dirty=%t,is_overweight=%t,is_broken=%t",
+		bits&1 != 0,
+		bits&2 != 0,
+		bits&4 != 0,
+	)
+}
+
+// コンパイル時に流石に関数呼び出ししない形式にしてほしい
+func levelStringFromInt(levelInt int) string {
+	switch levelInt {
+	case 0:
+		return conditionLevelInfo
+	case 1:
+		return conditionLevelWarning
+	case 2:
+		return conditionLevelCritical
+	default:
+		return conditionLevelWarning
 	}
 }
 
@@ -1627,8 +1645,8 @@ func postIsuCondition(c echo.Context) error {
 	}
 	_, err = tx.NamedExec(
 		"INSERT INTO `isu_condition`"+
-			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `condition_bits`, `level`, `level_int`, `message`)"+
-			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :condition_bits, :level, :level_int, :message)",
+			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition_bits`, `level_int`, `message`)"+
+			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition_bits, :level_int, :message)",
 		rows)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)

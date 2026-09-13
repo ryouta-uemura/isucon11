@@ -135,7 +135,6 @@ func addIsuMeta(meta IsuMeta) {
 	isuMetaByUUID[meta.JIAIsuUUID] = meta
 }
 
-
 func getTrendCache() ([]TrendResponse, uint64, bool) {
 	trendCacheMu.RLock()
 	defer trendCacheMu.RUnlock()
@@ -541,12 +540,10 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-
 	if err := loadIsuMetaCache(); err != nil {
 		c.Logger().Errorf("failed to load isu meta cache: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-
 
 	invalidateTrendCache()
 	return c.JSON(http.StatusOK, InitializeResponse{
@@ -869,14 +866,13 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-
 	// isuMeta cacheにも登録
 	addIsuMeta(IsuMeta{
-		ID: isu.ID,
+		ID:         isu.ID,
 		JIAIsuUUID: isu.JIAIsuUUID,
-		Name: isu.Name,
-		Character: isu.Character,
-		JIAUserID: isu.JIAUserID,
+		Name:       isu.Name,
+		Character:  isu.Character,
+		JIAUserID:  isu.JIAUserID,
 	})
 
 	invalidateTrendCache() // isuの登録があったら, invalidate!
@@ -1215,19 +1211,19 @@ func getIsuConditions(c echo.Context) error {
 	// 認可的な役目を果たしているクエリー
 	// アーリーリターンに役立つと思うので先にこれを実行するようにしてみる
 	// TODO: この処理がいろんなところで頻発する, (jia_isu_uuid と jia_user_idのペアの確認, これをどこかに切り出したい)
-//	var isuName string
-//	err = db.Get(&isuName,
-//		"SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
-//		jiaIsuUUID, jiaUserID,
-//	)
-//	if err != nil {
-//		if errors.Is(err, sql.ErrNoRows) {
-//			return c.String(http.StatusNotFound, "not found: isu")
-//		}
-//
-//		c.Logger().Errorf("db error: %v", err)
-//		return c.NoContent(http.StatusInternalServerError)
-//	}
+	//	var isuName string
+	//	err = db.Get(&isuName,
+	//		"SELECT name FROM `isu` WHERE `jia_isu_uuid` = ? AND `jia_user_id` = ?",
+	//		jiaIsuUUID, jiaUserID,
+	//	)
+	//	if err != nil {
+	//		if errors.Is(err, sql.ErrNoRows) {
+	//			return c.String(http.StatusNotFound, "not found: isu")
+	//		}
+	//
+	//		c.Logger().Errorf("db error: %v", err)
+	//		return c.NoContent(http.StatusInternalServerError)
+	//	}
 
 	meta, ok := getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID)
 	if !ok {
@@ -1483,10 +1479,10 @@ func postIsuCondition(c echo.Context) error {
 
 	//var count int
 	//err = tx.Get(&count, "SELECT 1 FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
-//	if err != nil {
-//		c.Logger().Errorf("db error: %v", err)
-//		return c.NoContent(http.StatusInternalServerError)
-//	}
+	//	if err != nil {
+	//		c.Logger().Errorf("db error: %v", err)
+	//		return c.NoContent(http.StatusInternalServerError)
+	//	}
 	if !existsIsu(jiaIsuUUID) { // in-memory cacheのみで判定
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
@@ -1533,24 +1529,59 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	latestChanged := false
 	var result sql.Result
 	if latest != nil {
 		// 普通のinsertだと主キーの重複で落ちる, ON DUPLICATE KEY UPDATEだと, もしなければ書き込み、あれば更新してくれるらしい
-		result, err = tx.NamedExec(`
-  		INSERT INTO latest_isu_condition
-  			(jia_isu_uuid, timestamp, is_sitting, `+"`condition`"+`, level, message)
-  		VALUES
-  			(:jia_isu_uuid, :timestamp, :is_sitting, :condition, :level, :message)
-  		ON DUPLICATE KEY UPDATE
-  			is_sitting = IF(VALUES(timestamp) > timestamp, VALUES(is_sitting), is_sitting),
-  			`+"`condition`"+` = IF(VALUES(timestamp) > timestamp, VALUES(`+"`condition`"+`), `+"`condition`"+`),
-  			level = IF(VALUES(timestamp) > timestamp, VALUES(level), level),
-  			message = IF(VALUES(timestamp) > timestamp, VALUES(message), message),
-  			timestamp = IF(VALUES(timestamp) > timestamp, VALUES(timestamp), timestamp)
-  	         `, latest)
+		result, err = tx.Exec(`
+		UPDATE latest_isu_condition
+		SET
+			timestamp = ?,
+			is_sitting = ?,
+			`+"`condition`"+` = ?,
+			level = ?,
+			message = ?
+		WHERE jia_isu_uuid = ?
+		  AND timestamp < ?
+		`,
+			latest.Timestamp,
+			latest.IsSitting,
+			latest.Condition,
+			latest.Level,
+			latest.Message,
+			latest.JIAIsuUUID,
+			latest.Timestamp,
+		)
 		if err != nil {
 			c.Logger().Errorf("db error: %v", err)
 			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		affected, err := result.RowsAffected()
+		if err != nil {
+			latestChanged = true
+		} else if affected > 0 {
+			latestChanged = true
+		}
+
+		if !latestChanged {
+			result, err = tx.NamedExec(`
+  		INSERT IGNORE INTO latest_isu_condition
+  			(jia_isu_uuid, timestamp, is_sitting, `+"`condition`"+`, level, message)
+  		VALUES
+  			(:jia_isu_uuid, :timestamp, :is_sitting, :condition, :level, :message)
+  	         `, latest)
+			if err != nil {
+				c.Logger().Errorf("db error: %v", err)
+				return c.NoContent(http.StatusInternalServerError)
+			}
+
+			affected, err := result.RowsAffected()
+			if err != nil {
+				latestChanged = true
+			} else if affected > 0 {
+				latestChanged = true
+			}
 		}
 	}
 
@@ -1560,11 +1591,12 @@ func postIsuCondition(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	affected, err := result.RowsAffected()
 	// 必ず書き込むのではなく, 更新があった時のみにする
 	// if err != nil && affected > 0 { // 実はこれでスコアが伸びてしまったのだが、これは重大な誤り, errがある場合はcache更新すべきタイミングではない(少なくともアプリの論理的には)
-	if err == nil && affected > 0 {
+	if latestChanged {
 		invalidateTrendCache()
+	} else {
+		fmt.Println("affected row is 0!!")
 	}
 	return c.NoContent(http.StatusAccepted)
 }

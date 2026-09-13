@@ -38,8 +38,8 @@ CREATE TABLE `latest_isu_condition` (
 	`jia_isu_uuid` CHAR(36) NOT NULL,
         `timestamp` DATETIME NOT NULL,
         `is_sitting` TINYINT(1) NOT NULL,
-        `condition` VARCHAR(255) NOT NULL,
-        `level` VARCHAR(8) NOT NULL,
+        `condition_bits`TINYINT UNSIGNED NOT NULL,
+        `level_int` TINYINT UNSIGNED  NOT NULL,
         `message` VARCHAR(255) NOT NULL,
         PRIMARY KEY(`jia_isu_uuid`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4;

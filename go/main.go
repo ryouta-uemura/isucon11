@@ -194,16 +194,16 @@ type GetIsuListResponse struct {
 }
 
 type IsuCondition struct {
-	ID            int       `db:"id"`
-	JIAIsuUUID    string    `db:"jia_isu_uuid"`
-	Timestamp     time.Time `db:"timestamp"`
-	IsSitting     bool      `db:"is_sitting"`
-//	Condition     string    `db:"condition"`
-	ConditionBits int       `db:"condition_bits"`
-//	Level         string    `db:"level"`
-	LevelInt      int       `db:"level_int"`
-	Message       string    `db:"message"`
-	CreatedAt     time.Time `db:"created_at"`
+	ID         int       `db:"id"`
+	JIAIsuUUID string    `db:"jia_isu_uuid"`
+	Timestamp  time.Time `db:"timestamp"`
+	IsSitting  bool      `db:"is_sitting"`
+	//	Condition     string    `db:"condition"`
+	ConditionBits int `db:"condition_bits"`
+	//	Level         string    `db:"level"`
+	LevelInt  int       `db:"level_int"`
+	Message   string    `db:"message"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 type MySQLConnectionEnv struct {
@@ -676,8 +676,8 @@ func getIsuList(c echo.Context) error {
 		Character       string         `db:"character"`
 		LatestTimestamp sql.NullTime   `db:"latest_timestamp"`
 		LatestIsSitting sql.NullBool   `db:"latest_is_sitting"`
-		LatestCondition sql.NullString `db:"latest_condition"`
-		LatestLevel     sql.NullString `db:"latest_level"`
+		LatestConditionBits sql.NullInt64`db:"latest_condition_bits"`
+		LatestLevelInt     sql.NullInt64 `db:"latest_level_int"`
 		LatestMessage   sql.NullString `db:"latest_message"`
 	}
 	isuList := []IsuListRow{}
@@ -686,8 +686,8 @@ func getIsuList(c echo.Context) error {
 		"SELECT i.id, i.jia_isu_uuid, i.name, i.`character`, "+
 			" l.timestamp as latest_timestamp,"+
 			" l.is_sitting as latest_is_sitting,"+
-			" l.`condition` as latest_condition,"+
-			" l.level as latest_level,"+
+			" l.`condition_bits` as latest_condition_bits,"+
+			" l.level_int as latest_level_int,"+
 			" l.message as latest_message"+
 			" FROM `isu` i "+
 			" LEFT JOIN latest_isu_condition l"+
@@ -710,8 +710,8 @@ func getIsuList(c echo.Context) error {
 				IsuName:        isu.Name,
 				Timestamp:      isu.LatestTimestamp.Time.Unix(),
 				IsSitting:      isu.LatestIsSitting.Bool,
-				Condition:      isu.LatestCondition.String,
-				ConditionLevel: isu.LatestLevel.String,
+				Condition:      conditionStringFromBits(int(isu.LatestConditionBits.Int64)),
+				ConditionLevel: levelStringFromInt(int(isu.LatestLevelInt.Int64)),
 				Message:        isu.LatestMessage.String,
 			}
 		}
@@ -1355,10 +1355,10 @@ func calculateConditionLevel(condition string) (string, error) {
 	return conditionLevel, nil
 }
 
-func parseConditionBits(conditionStr string) (bits int, level string, levelInt int, ok bool) {
+func parseConditionBits(conditionStr string) (bits int, levelInt int, ok bool) {
 	isDirty, isOverweight, isBroken, badCount, ok := parseConditionValues(conditionStr)
 	if !ok {
-		return 0, "", 0, false
+		return 0, 0, false
 	}
 
 	if isDirty {
@@ -1373,13 +1373,13 @@ func parseConditionBits(conditionStr string) (bits int, level string, levelInt i
 
 	switch badCount {
 	case 0:
-		return bits, conditionLevelInfo, 0, true
+		return bits, 0, true
 	case 1, 2:
-		return bits, conditionLevelWarning, 1, true
+		return bits, 1, true
 	case 3:
-		return bits, conditionLevelCritical, 2, true
+		return bits, 2, true
 	default:
-		return 0, "", 0, false
+		return 0, 0, false
 	}
 }
 
@@ -1503,11 +1503,11 @@ func getTrend(c echo.Context) error {
 		ID        int            `db:"id"`
 		Character string         `db:"character"`
 		Timestamp sql.NullTime   `db:"timestamp"` // nullな場合もあり得る. latest_conditionがないisuについて
-		Level     sql.NullString `db:"level"`
+		LevelInt     sql.NullInt64 `db:"level_int"`
 	}
 
 	var trendRows []TrendRow
-	err := db.Select(&trendRows, "SELECT i.id, i.character, l.timestamp, l.level FROM isu i"+
+	err := db.Select(&trendRows, "SELECT i.id, i.character, l.timestamp, l.level_int FROM isu i"+
 		" LEFT JOIN latest_isu_condition l"+
 		" ON l.jia_isu_uuid = i.jia_isu_uuid"+
 		" ORDER BY i.character",
@@ -1530,19 +1530,19 @@ func getTrend(c echo.Context) error {
 			byCharacter[trendRow.Character] = tr
 		}
 
-		if !trendRow.Timestamp.Valid || !trendRow.Level.Valid {
+		if !trendRow.Timestamp.Valid || !trendRow.LevelInt.Valid {
 			continue
 		}
 		tc := &TrendCondition{
 			ID:        trendRow.ID,
 			Timestamp: trendRow.Timestamp.Time.Unix(),
 		}
-		switch trendRow.Level.String {
-		case "info":
+		switch trendRow.LevelInt.Int64 {
+		case 0:
 			tr.Info = append(tr.Info, tc)
-		case "warning":
+		case 1:
 			tr.Warning = append(tr.Warning, tc)
-		case "critical":
+		case 2:
 			tr.Critical = append(tr.Critical, tc)
 		}
 
@@ -1619,7 +1619,7 @@ func postIsuCondition(c echo.Context) error {
 		}
 
 		//cLevel, err := calculateConditionLevel(cond.Condition)
-		bits, level, levelInt, ok := parseConditionBits(cond.Condition)
+		bits, levelInt, ok := parseConditionBits(cond.Condition)
 		if !ok {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
@@ -1628,9 +1628,7 @@ func postIsuCondition(c echo.Context) error {
 			JIAIsuUUID:    jiaIsuUUID,
 			Timestamp:     timestamp,
 			IsSitting:     cond.IsSitting,
-			Condition:     cond.Condition,
 			ConditionBits: bits,
-			Level:         level,
 			LevelInt:      levelInt,
 			Message:       cond.Message,
 		}
@@ -1662,16 +1660,16 @@ func postIsuCondition(c echo.Context) error {
 		SET
 			timestamp = ?,
 			is_sitting = ?,
-			`+"`condition`"+` = ?,
-			level = ?,
+			`+"`condition_bits`"+` = ?,
+			level_int = ?,
 			message = ?
 		WHERE jia_isu_uuid = ?
 		  AND timestamp < ?
 		`,
 			latest.Timestamp,
 			latest.IsSitting,
-			latest.Condition,
-			latest.Level,
+			latest.ConditionBits,
+			latest.LevelInt,
 			latest.Message,
 			latest.JIAIsuUUID,
 			latest.Timestamp,
@@ -1691,9 +1689,9 @@ func postIsuCondition(c echo.Context) error {
 		if !latestChanged {
 			result, err = tx.NamedExec(`
   		INSERT IGNORE INTO latest_isu_condition
-  			(jia_isu_uuid, timestamp, is_sitting, `+"`condition`"+`, level, message)
+  			(jia_isu_uuid, timestamp, is_sitting, `+"`condition_bits`"+`, level_int, message)
   		VALUES
-  			(:jia_isu_uuid, :timestamp, :is_sitting, :condition, :level, :message)
+  			(:jia_isu_uuid, :timestamp, :is_sitting, :condition_bits, :level_int, :message)
   	         `, latest)
 			if err != nil {
 				c.Logger().Errorf("db error: %v", err)

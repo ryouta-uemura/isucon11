@@ -1,6 +1,6 @@
 INSERT INTO `latest_isu_condition`
-  (`jia_isu_uuid`, `timestamp`, `is_sitting`,`condition`, `level`, `message`)
-SELECT  c.`jia_isu_uuid`, c.`timestamp`, c.`is_sitting`, c.`condition`, c.`level`, c.`message`
+  (`jia_isu_uuid`, `timestamp`, `is_sitting`,`condition_bits`, `level_int`, `message`)
+SELECT  c.`jia_isu_uuid`, c.`timestamp`, c.`is_sitting`, c.`condition_bits`, c.`level_int`, c.`message`
 FROM isu_condition c
 JOIN (
 	SELECT jia_isu_uuid , MAX(timestamp) as max_timestamp

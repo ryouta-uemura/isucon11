@@ -1281,9 +1281,16 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	conditions := []IsuCondition{}
 	var err error
 
-	conditionLevels := []string{}
-	for level, _ := range conditionLevel {
-		conditionLevels = append(conditionLevels, level)
+	conditionLevels := []int{}
+	for level := range conditionLevel {
+		switch level {
+		case "info" :
+			conditionLevels = append(conditionLevels, 0)
+		case "warning" :
+			conditionLevels = append(conditionLevels, 1)
+		case "critical" :
+			conditionLevels = append(conditionLevels, 2)
+		}
 	}
 	var query string
 	var params []interface{}
@@ -1292,7 +1299,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 		query, params, err = sqlx.In(
 			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
-				"       AND `level` in (?)"+
+				"       AND `level_int` in (?)"+
 				"	ORDER BY `timestamp` DESC"+
 				"       LIMIT ?",
 			jiaIsuUUID, endTime, conditionLevels, limit,
@@ -1302,7 +1309,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"	AND ? <= `timestamp`"+
-				"       AND `level` in (?)"+
+				"       AND `level_int` in (?)"+
 				"	ORDER BY `timestamp` DESC"+
 				"       LIMIT ?",
 			jiaIsuUUID, endTime, startTime, conditionLevels, limit,

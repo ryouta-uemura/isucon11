@@ -83,11 +83,23 @@ type IsuMeta struct {
 
 func loadIsuMetaCache() error {
 	var rows []IsuMeta
-	err := db.Select(&rows, `
-		SELECT id, jia_isu_uuid, name, `+"`character`"+`, jia_user_id
+	dbRows, err := db.Queryx(`
+		SELECT id, jia_isu_uuid, name, ` + "`character`" + `, jia_user_id
 		FROM isu
 	`)
 	if err != nil {
+		return err
+	}
+	defer dbRows.Close()
+
+	for dbRows.Next() {
+		var row IsuMeta
+		if err := dbRows.Scan(&row.ID, &row.JIAIsuUUID, &row.Name, &row.Character, &row.JIAUserID); err != nil {
+			return err
+		}
+		rows = append(rows, row)
+	}
+	if err := dbRows.Err(); err != nil {
 		return err
 	}
 
@@ -127,7 +139,7 @@ func getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID string) (IsuMeta, bool) {
 	return meta, true
 }
 
-/// when isu added to DB
+// when isu added to DB
 func addIsuMeta(meta IsuMeta) {
 	isuMetaMu.Lock()
 	defer isuMetaMu.Unlock()
@@ -342,7 +354,7 @@ func exportIsuIconsToFile() error {
 			Image      []byte `db:"image"`
 			JIAUserID  string `db:"jia_user_id"`
 		}
-		if err := rows.StructScan(&isu); err != nil {
+		if err := rows.Scan(&isu.JIAIsuUUID, &isu.Image, &isu.JIAUserID); err != nil {
 			return err
 		}
 		if err := saveIsuIconToFile(isu.JIAIsuUUID, isu.JIAUserID, isu.Image); err != nil {
@@ -426,9 +438,7 @@ func main() {
 	}
 
 	// global変数のjiaURLに代入する
-	var config Config
-	err = db.Get(&config, "SELECT * FROM `isu_association_config` WHERE `name` = ?", "jia_service_url")
-	jiaURL = config.URL
+	err = db.QueryRowx("SELECT url FROM `isu_association_config` WHERE `name` = ?", "jia_service_url").Scan(&jiaURL)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.Print(err)
@@ -515,15 +525,15 @@ func getUserIDFromSession(c echo.Context) (string, int, error) {
 }
 
 func getJIAServiceURL(tx *sqlx.Tx) string {
-	var config Config
-	err := tx.Get(&config, "SELECT * FROM `isu_association_config` WHERE `name` = ?", "jia_service_url")
+	var url string
+	err := tx.QueryRowx("SELECT url FROM `isu_association_config` WHERE `name` = ?", "jia_service_url").Scan(&url)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.Print(err)
 		}
 		return defaultJIAServiceURL
 	}
-	return config.URL
+	return url
 }
 
 // POST /initialize
@@ -693,25 +703,24 @@ func getIsuList(c echo.Context) error {
 	}
 
 	type IsuListRow struct {
-		ID                  int            `db:"id"`
-		JIAIsuUUID          string         `db:"jia_isu_uuid"`
-		Name                string         `db:"name"`
-		Character           string         `db:"character"`
-		LatestTimestamp     sql.NullTime   `db:"latest_timestamp"`
-		LatestIsSitting     sql.NullBool   `db:"latest_is_sitting"`
-		LatestConditionBits sql.NullInt64  `db:"latest_condition_bits"`
-		LatestLevelInt      sql.NullInt64  `db:"latest_level_int"`
-		LatestMessage       sql.NullString `db:"latest_message"`
+		ID                  int
+		JIAIsuUUID          string
+		Name                string
+		Character           string
+		LatestTimestampUnix sql.NullInt64
+		LatestIsSitting     sql.NullBool
+		LatestConditionBits sql.NullInt64
+		LatestLevelInt      sql.NullInt64
+		LatestMessage       sql.NullString
 	}
 	isuList := []IsuListRow{}
-	err = db.Select(
-		&isuList,
+	rows, err := db.Queryx(
 		"SELECT i.id, i.jia_isu_uuid, i.name, i.`character`, "+
-			" l.timestamp as latest_timestamp,"+
-			" l.is_sitting as latest_is_sitting,"+
-			" l.`condition_bits` as latest_condition_bits,"+
-			" l.level_int as latest_level_int,"+
-			" l.message as latest_message"+
+			" UNIX_TIMESTAMP(l.timestamp),"+
+			" l.is_sitting,"+
+			" l.`condition_bits`,"+
+			" l.level_int,"+
+			" l.message"+
 			" FROM `isu` i "+
 			" LEFT JOIN latest_isu_condition l"+
 			" ON l.jia_isu_uuid = i.jia_isu_uuid"+
@@ -722,16 +731,40 @@ func getIsuList(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var isu IsuListRow
+		if err := rows.Scan(
+			&isu.ID,
+			&isu.JIAIsuUUID,
+			&isu.Name,
+			&isu.Character,
+			&isu.LatestTimestampUnix,
+			&isu.LatestIsSitting,
+			&isu.LatestConditionBits,
+			&isu.LatestLevelInt,
+			&isu.LatestMessage,
+		); err != nil {
+			c.Logger().Errorf("db error: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		isuList = append(isuList, isu)
+	}
+	if err := rows.Err(); err != nil {
+		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
 
 	responseList := []GetIsuListResponse{}
 
 	for _, isu := range isuList {
 		var formattedCondition *GetIsuConditionResponse
-		if isu.LatestTimestamp.Valid {
+		if isu.LatestTimestampUnix.Valid {
 			formattedCondition = &GetIsuConditionResponse{
 				JIAIsuUUID:     isu.JIAIsuUUID,
 				IsuName:        isu.Name,
-				Timestamp:      isu.LatestTimestamp.Time.Unix(),
+				Timestamp:      isu.LatestTimestampUnix.Int64,
 				IsSitting:      isu.LatestIsSitting.Bool,
 				Condition:      conditionStringFromBits(int(isu.LatestConditionBits.Int64)),
 				ConditionLevel: levelStringFromInt(int(isu.LatestLevelInt.Int64)),
@@ -876,10 +909,10 @@ func postIsu(c echo.Context) error {
 	}
 
 	var isu Isu
-	err = tx.Get(
-		&isu,
-		"SELECT * FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-		jiaUserID, jiaIsuUUID)
+	err = tx.QueryRowx(
+		"SELECT id, jia_isu_uuid, name, `character`, jia_user_id FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+		jiaUserID, jiaIsuUUID,
+	).Scan(&isu.ID, &isu.JIAIsuUUID, &isu.Name, &isu.Character, &isu.JIAUserID)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
@@ -924,8 +957,10 @@ func getIsuID(c echo.Context) error {
 	// schema側でINVISIBLEを付与してみた -> 時間は半分くらいに, あとは整合性エラーが出るのかと思ったが出なかった
 	// ここで要求されてるレスポンスはなんなんだ？どこかに定義されているのか？？
 	// このレスポンスの省略は, 合法なのか？
-	err = db.Get(&res, "SELECT * FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-		jiaUserID, jiaIsuUUID)
+	err = db.QueryRowx(
+		"SELECT id, jia_isu_uuid, name, `character` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+		jiaUserID, jiaIsuUUID,
+	).Scan(&res.ID, &res.JIAIsuUUID, &res.Name, &res.Character)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.String(http.StatusNotFound, "not found: isu")
@@ -1355,7 +1390,6 @@ func getIsuConditions(c echo.Context) error {
 func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, conditionLevel map[string]interface{}, startTime time.Time,
 	limit int, isuName string) ([]*GetIsuConditionResponse, error) {
 
-	conditions := []IsuCondition{}
 	var err error
 
 	conditionLevels := []int{}
@@ -1374,7 +1408,8 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 
 	if startTime.IsZero() {
 		query, params, err = sqlx.In(
-			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
+			"SELECT jia_isu_uuid, UNIX_TIMESTAMP(timestamp), is_sitting, condition_bits, level_int, message"+
+				" FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"       AND `level_int` in (?)"+
 				"	ORDER BY `timestamp` DESC"+
@@ -1383,7 +1418,8 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 		)
 	} else {
 		query, params, err = sqlx.In(
-			"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
+			"SELECT jia_isu_uuid, UNIX_TIMESTAMP(timestamp), is_sitting, condition_bits, level_int, message"+
+				" FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
 				"	AND `timestamp` < ?"+
 				"	AND ? <= `timestamp`"+
 				"       AND `level_int` in (?)"+
@@ -1396,23 +1432,35 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 		return nil, fmt.Errorf("db error: %v", err)
 	}
 
-	err = db.Select(&conditions, db.Rebind(query), params...)
+	rows, err := db.Queryx(db.Rebind(query), params...)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	conditionsResponse := []*GetIsuConditionResponse{}
-	for _, c := range conditions {
+	for rows.Next() {
 		data := GetIsuConditionResponse{
-			JIAIsuUUID:     c.JIAIsuUUID,
-			IsuName:        isuName,
-			Timestamp:      c.Timestamp.Unix(),
-			IsSitting:      c.IsSitting,
-			Condition:      conditionStringFromBits(c.ConditionBits),
-			ConditionLevel: levelStringFromInt(c.LevelInt),
-			Message:        c.Message,
+			IsuName: isuName,
 		}
+		var conditionBits int
+		var levelInt int
+		if err := rows.Scan(
+			&data.JIAIsuUUID,
+			&data.Timestamp,
+			&data.IsSitting,
+			&conditionBits,
+			&levelInt,
+			&data.Message,
+		); err != nil {
+			return nil, err
+		}
+		data.Condition = conditionStringFromBits(conditionBits)
+		data.ConditionLevel = levelStringFromInt(levelInt)
 		conditionsResponse = append(conditionsResponse, &data)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return conditionsResponse, nil
@@ -1582,20 +1630,32 @@ func getTrend(c echo.Context) error {
 	res := []TrendResponse{}
 
 	type TrendRow struct {
-		ID        int           `db:"id"`
-		Character string        `db:"character"`
-		Timestamp sql.NullTime  `db:"timestamp"` // nullな場合もあり得る. latest_conditionがないisuについて
-		LevelInt  sql.NullInt64 `db:"level_int"`
+		ID            int
+		Character     string
+		TimestampUnix sql.NullInt64
+		LevelInt      sql.NullInt64
 	}
 
 	var trendRows []TrendRow
-	err := db.Select(&trendRows, "SELECT i.id, i.character, l.timestamp, l.level_int FROM isu i"+
-		" LEFT JOIN latest_isu_condition l"+
-		" ON l.jia_isu_uuid = i.jia_isu_uuid"+
+	rows, err := db.Queryx("SELECT i.id, i.character, UNIX_TIMESTAMP(l.timestamp), l.level_int FROM isu i" +
+		" LEFT JOIN latest_isu_condition l" +
+		" ON l.jia_isu_uuid = i.jia_isu_uuid" +
 		" ORDER BY i.character",
 	)
 
 	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var row TrendRow
+		if err := rows.Scan(&row.ID, &row.Character, &row.TimestampUnix, &row.LevelInt); err != nil {
+			return err
+		}
+		trendRows = append(trendRows, row)
+	}
+	if err := rows.Err(); err != nil {
 		return err
 	}
 
@@ -1611,12 +1671,12 @@ func getTrend(c echo.Context) error {
 			}
 			byCharacter[trendRow.Character] = tr
 		}
-		if !trendRow.Timestamp.Valid || !trendRow.LevelInt.Valid {
+		if !trendRow.TimestampUnix.Valid || !trendRow.LevelInt.Valid {
 			continue
 		}
 		tc := &TrendCondition{
 			ID:        trendRow.ID,
-			Timestamp: trendRow.Timestamp.Time.Unix(),
+			Timestamp: trendRow.TimestampUnix.Int64,
 		}
 		switch trendRow.LevelInt.Int64 {
 		case 0:
@@ -1839,3 +1899,4 @@ func isValidConditionFormat(conditionStr string) bool {
 func getIndex(c echo.Context) error {
 	return c.File(frontendContentsPath + "/index.html")
 }
+

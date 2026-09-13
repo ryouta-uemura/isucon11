@@ -194,14 +194,16 @@ type GetIsuListResponse struct {
 }
 
 type IsuCondition struct {
-	ID         int       `db:"id"`
-	JIAIsuUUID string    `db:"jia_isu_uuid"`
-	Timestamp  time.Time `db:"timestamp"`
-	IsSitting  bool      `db:"is_sitting"`
-	Condition  string    `db:"condition"`
-	Level      string    `db:"level"`
-	Message    string    `db:"message"`
-	CreatedAt  time.Time `db:"created_at"`
+	ID            int       `db:"id"`
+	JIAIsuUUID    string    `db:"jia_isu_uuid"`
+	Timestamp     time.Time `db:"timestamp"`
+	IsSitting     bool      `db:"is_sitting"`
+	Condition     string    `db:"condition"`
+	ConditionBits int       `db:"condition_bits"`
+	Level         string    `db:"level"`
+	LevelInt      int       `db:"level_int"`
+	Message       string    `db:"message"`
+	CreatedAt     time.Time `db:"created_at"`
 }
 
 type MySQLConnectionEnv struct {
@@ -1132,38 +1134,47 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 
 // 複数のISUのコンディションからグラフの一つのデータ点を計算
 func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, error) {
-	conditionsCount := map[string]int{"is_broken": 0, "is_dirty": 0, "is_overweight": 0}
-	rawScore := 0
-	for _, condition := range isuConditions {
-		badConditionsCount := 0
+	if len(isuConditions) == 0 {
+		return GraphDataPoint{}, fmt.Errorf("empty conditions")
+	}
 
+	isBrokenCount := 0
+	isDirtyCount := 0
+	isOverweightCount := 0
+	rawScore := 0
+	sittingCount := 0
+
+	for _, condition := range isuConditions {
+		// 多分このチェックも不要になるかなぁ,すでにしてるはずなので
 		if !isValidConditionFormat(condition.Condition) {
 			return GraphDataPoint{}, fmt.Errorf("invalid condition format")
 		}
 
-		// TODO: テキストじゃなくて, なんか違う形式でこのデータ持ちたいなぁ
-		for _, condStr := range strings.Split(condition.Condition, ",") {
-			keyValue := strings.Split(condStr, "=")
-
-			conditionName := keyValue[0]
-			if keyValue[1] == "true" {
-				conditionsCount[conditionName] += 1
-				badConditionsCount++
-			}
+		if condition.ConditionBits&^7 != 0 {
+			return GraphDataPoint{}, fmt.Errorf("invalid condition level")
 		}
 
-		// TODO: あんまり意味なさそうなことだけど, 一回一回やらなくても集計された結果に対してやれば良さそう
-		if badConditionsCount >= 3 {
-			rawScore += scoreConditionLevelCritical
-		} else if badConditionsCount >= 1 {
-			rawScore += scoreConditionLevelWarning
-		} else {
+		if condition.ConditionBits&1 != 0 {
+			isDirtyCount++
+		}
+		if condition.ConditionBits&2 != 0 {
+			isOverweightCount++
+		}
+		if condition.ConditionBits&4 != 0 {
+			isBrokenCount++
+		}
+
+		switch condition.LevelInt {
+		case 0:
 			rawScore += scoreConditionLevelInfo
+		case 1:
+			rawScore += scoreConditionLevelWarning
+		case 2:
+			rawScore += scoreConditionLevelCritical
+		default:
+			return GraphDataPoint{}, fmt.Errorf("invalid condition level")
 		}
-	}
 
-	sittingCount := 0
-	for _, condition := range isuConditions {
 		if condition.IsSitting {
 			sittingCount++
 		}
@@ -1174,9 +1185,9 @@ func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, erro
 	score := rawScore * 100 / 3 / isuConditionsLength
 
 	sittingPercentage := sittingCount * 100 / isuConditionsLength
-	isBrokenPercentage := conditionsCount["is_broken"] * 100 / isuConditionsLength
-	isOverweightPercentage := conditionsCount["is_overweight"] * 100 / isuConditionsLength
-	isDirtyPercentage := conditionsCount["is_dirty"] * 100 / isuConditionsLength
+	isBrokenPercentage := isBrokenCount * 100 / isuConditionsLength
+	isOverweightPercentage := isOverweightCount * 100 / isuConditionsLength
+	isDirtyPercentage := isDirtyCount * 100 / isuConditionsLength
 
 	dataPoint := GraphDataPoint{
 		Score: score,
@@ -1342,6 +1353,91 @@ func calculateConditionLevel(condition string) (string, error) {
 	return conditionLevel, nil
 }
 
+func parseConditionBits(conditionStr string) (bits int, level string, levelInt int, ok bool) {
+	isDirty, isOverweight, isBroken, badCount, ok := parseConditionValues(conditionStr)
+	if !ok {
+		return 0, "", 0, false
+	}
+
+	if isDirty {
+		bits |= 1
+	}
+	if isOverweight {
+		bits |= 2
+	}
+	if isBroken {
+		bits |= 4
+	}
+
+	switch badCount {
+	case 0:
+		return bits, conditionLevelInfo, 0, true
+	case 1, 2:
+		return bits, conditionLevelWarning, 1, true
+	case 3:
+		return bits, conditionLevelCritical, 2, true
+	default:
+		return 0, "", 0, false
+	}
+}
+
+func parseConditionValues(conditionStr string) (isDirty bool, isOverweight bool, isBroken bool, badConditionCount int, ok bool) {
+	const valueTrue = "true"
+	const valueFalse = "false"
+	idxCondStr := 0 // where we are reading now?
+	readBool := func(key string) (bool, bool) {
+
+		if idxCondStr > len(conditionStr) || !strings.HasPrefix(conditionStr[idxCondStr:], key) {
+			return false, false
+		}
+		idxCondStr += len(key)
+
+		if strings.HasPrefix(conditionStr[idxCondStr:], valueTrue) {
+			idxCondStr += len(valueTrue)
+			return true, true
+		} else if strings.HasPrefix(conditionStr[idxCondStr:], valueFalse) {
+			idxCondStr += len(valueFalse)
+			return false, true
+		} else {
+			return false, false
+		}
+	}
+
+	readComma := func() bool {
+		if idxCondStr >= len(conditionStr) || conditionStr[idxCondStr] != ',' {
+			return false
+		}
+		idxCondStr++
+		return true
+	}
+
+	var valid bool
+	isDirty, valid = readBool("is_dirty=")
+	if !valid || !readComma() {
+		return false, false, false, 0, false
+	}
+	isOverweight, valid = readBool("is_overweight=")
+	if !valid || !readComma() {
+		return false, false, false, 0, false
+	}
+	isBroken, valid = readBool("is_broken=")
+	if !valid || idxCondStr != len(conditionStr) {
+		return false, false, false, 0, false
+	}
+
+	if isDirty {
+		badConditionCount++
+	}
+	if isOverweight {
+		badConditionCount++
+	}
+	if isBroken {
+		badConditionCount++
+	}
+
+	return isDirty, isOverweight, isBroken, badConditionCount, true
+}
+
 // GET /api/trend
 // ISUの性格毎の最新のコンディション情報
 func getTrend(c echo.Context) error {
@@ -1497,18 +1593,21 @@ func postIsuCondition(c echo.Context) error {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
 
-		cLevel, err := calculateConditionLevel(cond.Condition)
-		if err != nil {
+		//cLevel, err := calculateConditionLevel(cond.Condition)
+		bits, level, levelInt, ok := parseConditionBits(cond.Condition)
+		if !ok {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
 
 		row := IsuCondition{
-			JIAIsuUUID: jiaIsuUUID,
-			Timestamp:  timestamp,
-			IsSitting:  cond.IsSitting,
-			Condition:  cond.Condition,
-			Level:      cLevel,
-			Message:    cond.Message,
+			JIAIsuUUID:    jiaIsuUUID,
+			Timestamp:     timestamp,
+			IsSitting:     cond.IsSitting,
+			Condition:     cond.Condition,
+			ConditionBits: bits,
+			Level:         level,
+			LevelInt:      levelInt,
+			Message:       cond.Message,
 		}
 
 		rows = append(rows, row)
@@ -1521,8 +1620,8 @@ func postIsuCondition(c echo.Context) error {
 	}
 	_, err = tx.NamedExec(
 		"INSERT INTO `isu_condition`"+
-			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `level`, `message`)"+
-			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :level, :message)",
+			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition`, `condition_bits`, `level`, `level_int`, `message`)"+
+			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition, :condition_bits, :level, :level_int, :message)",
 		rows)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)

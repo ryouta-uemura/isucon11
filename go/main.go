@@ -1041,120 +1041,6 @@ func getIsuGraph(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-// グラフのデータ点を一日分生成
-func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
-	dataPoints := []GraphDataPointWithInfo{}
-	conditionsInThisHour := []IsuCondition{}
-	timestampsInThisHour := []int64{}
-	var startTimeInThisHour time.Time
-	var condition IsuCondition
-
-	// 全部のconditionをとってくる必要性はない
-	// from start hour -> end hourまでで良さそう? (date単位？), graphDate -> graphDate + 24hour
-	endTime := graphDate.Add(24 * time.Hour)
-
-	rows, err := tx.Queryx("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ?"+
-		" AND timestamp >= ?"+
-		" AND timestamp < ?"+
-		" ORDER BY `timestamp` ASC",
-		jiaIsuUUID, graphDate, endTime) // 元のロジックでは, endTimeIndexより小さいデータをfilterしている
-	if err != nil {
-		return nil, fmt.Errorf("db error: %v", err)
-	}
-
-	for rows.Next() {
-		err = rows.StructScan(&condition)
-		if err != nil {
-			return nil, err
-		}
-
-		truncatedConditionTime := condition.Timestamp.Truncate(time.Hour)
-		if truncatedConditionTime != startTimeInThisHour {
-			if len(conditionsInThisHour) > 0 {
-				data, err := calculateGraphDataPoint(conditionsInThisHour)
-				if err != nil {
-					return nil, err
-				}
-
-				dataPoints = append(dataPoints,
-					GraphDataPointWithInfo{
-						JIAIsuUUID:          jiaIsuUUID,
-						StartAt:             startTimeInThisHour,
-						Data:                data,
-						ConditionTimestamps: timestampsInThisHour})
-			}
-
-			startTimeInThisHour = truncatedConditionTime
-			conditionsInThisHour = []IsuCondition{}
-			timestampsInThisHour = []int64{}
-		}
-		conditionsInThisHour = append(conditionsInThisHour, condition)
-		timestampsInThisHour = append(timestampsInThisHour, condition.Timestamp.Unix())
-	}
-
-	if len(conditionsInThisHour) > 0 {
-		data, err := calculateGraphDataPoint(conditionsInThisHour)
-		if err != nil {
-			return nil, err
-		}
-
-		dataPoints = append(dataPoints,
-			GraphDataPointWithInfo{
-				JIAIsuUUID:          jiaIsuUUID,
-				StartAt:             startTimeInThisHour,
-				Data:                data,
-				ConditionTimestamps: timestampsInThisHour})
-	}
-
-	// ここのロジックは不要, すでにこの間の時刻のconditionしか取得してないから
-	//startIndex := len(dataPoints)
-	//endNextIndex := len(dataPoints)
-	//for i, graph := range dataPoints {
-	//	if startIndex == len(dataPoints) && !graph.StartAt.Before(graphDate) {
-	//		startIndex = i
-	//	}
-	//	if endNextIndex == len(dataPoints) && graph.StartAt.After(endTime) {
-	//		endNextIndex = i
-	//	}
-	//}
-
-	//filteredDataPoints := []GraphDataPointWithInfo{}
-	//if startIndex < endNextIndex {
-	//	filteredDataPoints = dataPoints[startIndex:endNextIndex]
-	//}
-
-	responseList := []GraphResponse{}
-	index := 0
-	thisTime := graphDate
-
-	for thisTime.Before(graphDate.Add(time.Hour * 24)) {
-		var data *GraphDataPoint
-		timestamps := []int64{}
-
-		if index < len(dataPoints) {
-			dataWithInfo := dataPoints[index]
-
-			if dataWithInfo.StartAt.Equal(thisTime) {
-				data = &dataWithInfo.Data
-				timestamps = dataWithInfo.ConditionTimestamps
-				index++
-			}
-		}
-
-		resp := GraphResponse{
-			StartAt:             thisTime.Unix(),
-			EndAt:               thisTime.Add(time.Hour).Unix(),
-			Data:                data,
-			ConditionTimestamps: timestamps,
-		}
-		responseList = append(responseList, resp)
-
-		thisTime = thisTime.Add(time.Hour)
-	}
-
-	return responseList, nil
-}
-
 // 複数のISUのコンディションからグラフの一つのデータ点を計算
 func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, error) {
 	if len(isuConditions) == 0 {
@@ -1217,6 +1103,179 @@ func calculateGraphDataPoint(isuConditions []IsuCondition) (GraphDataPoint, erro
 		},
 	}
 	return dataPoint, nil
+}
+
+type graphConditionRow struct {
+	TimestampUnix int64
+	IsSitting     bool
+	ConditionBits int
+	LevelInt      int
+}
+
+func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
+	dataPoints := []GraphDataPointWithInfo{}
+	conditionsInThisHour := []graphConditionRow{}
+	timestampsInThisHour := []int64{}
+	var startTimeInThisHour time.Time
+
+	endTime := graphDate.Add(24 * time.Hour)
+
+	rows, err := tx.Queryx(`
+  		SELECT
+  			UNIX_TIMESTAMP(timestamp),
+  			is_sitting,
+  			condition_bits,
+  			level_int
+  		FROM isu_condition
+  		WHERE jia_isu_uuid = ?
+  		  AND timestamp >= ?
+  		  AND timestamp < ?
+  		ORDER BY timestamp ASC
+  	`, jiaIsuUUID, graphDate, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("db error: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var condition graphConditionRow
+		if err := rows.Scan(
+			&condition.TimestampUnix,
+			&condition.IsSitting,
+			&condition.ConditionBits,
+			&condition.LevelInt,
+		); err != nil {
+			return nil, err
+		}
+
+		conditionTime := time.Unix(condition.TimestampUnix, 0)
+		truncatedConditionTime := conditionTime.Truncate(time.Hour)
+
+		if !truncatedConditionTime.Equal(startTimeInThisHour) {
+			if len(conditionsInThisHour) > 0 {
+				data, err := calculateGraphDataPointFast(conditionsInThisHour)
+				if err != nil {
+					return nil, err
+				}
+
+				dataPoints = append(dataPoints, GraphDataPointWithInfo{
+					JIAIsuUUID:          jiaIsuUUID,
+					StartAt:             startTimeInThisHour,
+					Data:                data,
+					ConditionTimestamps: timestampsInThisHour,
+				})
+			}
+
+			startTimeInThisHour = truncatedConditionTime
+			conditionsInThisHour = []graphConditionRow{}
+			timestampsInThisHour = []int64{}
+		}
+
+		conditionsInThisHour = append(conditionsInThisHour, condition)
+		timestampsInThisHour = append(timestampsInThisHour, condition.TimestampUnix)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(conditionsInThisHour) > 0 {
+		data, err := calculateGraphDataPointFast(conditionsInThisHour)
+		if err != nil {
+			return nil, err
+		}
+
+		dataPoints = append(dataPoints, GraphDataPointWithInfo{
+			JIAIsuUUID:          jiaIsuUUID,
+			StartAt:             startTimeInThisHour,
+			Data:                data,
+			ConditionTimestamps: timestampsInThisHour,
+		})
+	}
+
+	responseList := []GraphResponse{}
+	index := 0
+	thisTime := graphDate
+
+	for thisTime.Before(graphDate.Add(time.Hour * 24)) {
+		var data *GraphDataPoint
+		timestamps := []int64{}
+
+		if index < len(dataPoints) {
+			dataWithInfo := dataPoints[index]
+
+			if dataWithInfo.StartAt.Equal(thisTime) {
+				data = &dataWithInfo.Data
+				timestamps = dataWithInfo.ConditionTimestamps
+				index++
+			}
+		}
+
+		responseList = append(responseList, GraphResponse{
+			StartAt:             thisTime.Unix(),
+			EndAt:               thisTime.Add(time.Hour).Unix(),
+			Data:                data,
+			ConditionTimestamps: timestamps,
+		})
+
+		thisTime = thisTime.Add(time.Hour)
+	}
+
+	return responseList, nil
+}
+
+func calculateGraphDataPointFast(conditions []graphConditionRow) (GraphDataPoint, error) {
+	if len(conditions) == 0 {
+		return GraphDataPoint{}, fmt.Errorf("empty conditions")
+	}
+
+	isBrokenCount := 0
+	isDirtyCount := 0
+	isOverweightCount := 0
+	rawScore := 0
+	sittingCount := 0
+
+	for _, condition := range conditions {
+		if condition.ConditionBits&^7 != 0 {
+			return GraphDataPoint{}, fmt.Errorf("invalid condition bits")
+		}
+
+		if condition.ConditionBits&1 != 0 {
+			isDirtyCount++
+		}
+		if condition.ConditionBits&2 != 0 {
+			isOverweightCount++
+		}
+		if condition.ConditionBits&4 != 0 {
+			isBrokenCount++
+		}
+
+		switch condition.LevelInt {
+		case 0:
+			rawScore += scoreConditionLevelInfo
+		case 1:
+			rawScore += scoreConditionLevelWarning
+		case 2:
+			rawScore += scoreConditionLevelCritical
+		default:
+			return GraphDataPoint{}, fmt.Errorf("invalid condition level")
+		}
+
+		if condition.IsSitting {
+			sittingCount++
+		}
+	}
+
+	n := len(conditions)
+
+	return GraphDataPoint{
+		Score: rawScore * 100 / 3 / n,
+		Percentage: ConditionsPercentage{
+			Sitting:      sittingCount * 100 / n,
+			IsBroken:     isBrokenCount * 100 / n,
+			IsOverweight: isOverweightCount * 100 / n,
+			IsDirty:      isDirtyCount * 100 / n,
+		},
+	}, nil
 }
 
 // GET /api/condition/:jia_isu_uuid

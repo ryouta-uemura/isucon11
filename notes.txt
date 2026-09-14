@@ -39,3 +39,25 @@ content-encoding: gzip
 operational errorめっちゃ出る、手書きなんでね...
 
 
+# transactionを一部消した
+  前回 23:25 と比べると:
+
+  database/sql.withLock      1.42s -> 1.16s (ブレあり)
+  generateIsuGraphResponse   1.02s -> 0.92s (嘘、ブレあり)
+  Rows.Scan                  0.40s -> 0.28s 
+  convertAssignRows          0.35s -> 0.25s
+  getIsuGraph                1.61s -> 表示圏外/かなり低下
+  sqlx.(*DB).Beginx          0.24s -> 消滅  (正しい)
+
+  Beginx が消えて、withLock も下がっているので、START TRANSACTION/COMMIT とTx接続保持を外した効果はちゃんと出ています。graphまわりも 1.02s ->
+  0.92s なので、派手ではないですが勝ちです。
+
+  一方で全体の支配構造は変わっていません。
+
+  runtime.epollwait      9.94s
+  runtime.netpoll       14.08s
+  runtime.findrunnable  18.72s
+  runtime.schedule      16.90s
+
+  つまり、tx削除でGo/DB接続まわりの小さい無駄は削れたけど、全体はまだI/O待ち・スケジューリング待ちが主戦場です。
+

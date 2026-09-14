@@ -1042,13 +1042,6 @@ func getIsuGraph(c echo.Context) error {
 	}
 	date := time.Unix(datetimeInt64, 0).Truncate(time.Hour)
 
-	tx, err := db.Beginx()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
-
 	//var count int
 	//err = tx.Get(&count, "SELECT COUNT(*) FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 	//	jiaUserID, jiaIsuUUID)
@@ -1061,15 +1054,9 @@ func getIsuGraph(c echo.Context) error {
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
-	res, err := generateIsuGraphResponse(tx, jiaIsuUUID, date)
+	res, err := generateIsuGraphResponse(db, jiaIsuUUID, date)
 	if err != nil {
 		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -1147,7 +1134,7 @@ type graphConditionRow struct {
 	LevelInt      int
 }
 
-func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
+func generateIsuGraphResponse(db *sqlx.DB, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
 	dataPoints := []GraphDataPointWithInfo{}
 	conditionsInThisHour := []graphConditionRow{}
 	timestampsInThisHour := []int64{}
@@ -1155,7 +1142,7 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 
 	endTime := graphDate.Add(24 * time.Hour)
 
-	rows, err := tx.Queryx(`
+	rows, err := db.Queryx(`
   		SELECT
   			UNIX_TIMESTAMP(timestamp),
   			is_sitting,

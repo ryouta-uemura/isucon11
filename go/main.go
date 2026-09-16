@@ -71,6 +71,8 @@ var (
 
 	sessionUserCache sync.Map // session cookie string -> jia_user_id
 	// skipping the cryptographic calculations
+
+	emptyInt64Slice = []int64{}
 )
 
 type IsuMeta struct {
@@ -82,7 +84,7 @@ type IsuMeta struct {
 }
 
 func loadIsuMetaCache() error {
-	var rows []IsuMeta
+	rows := make([]IsuMeta, 0, 1024)
 	dbRows, err := db.Queryx(`
 		SELECT id, jia_isu_uuid, name, ` + "`character`" + `, jia_user_id
 		FROM isu
@@ -713,7 +715,7 @@ func getIsuList(c echo.Context) error {
 		LatestLevelInt      sql.NullInt64
 		LatestMessage       sql.NullString
 	}
-	isuList := []IsuListRow{}
+	isuList := make([]IsuListRow, 0, 64)
 	rows, err := db.Queryx(
 		"SELECT i.id, i.jia_isu_uuid, i.name, i.`character`, "+
 			" UNIX_TIMESTAMP(l.timestamp),"+
@@ -756,7 +758,7 @@ func getIsuList(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	responseList := []GetIsuListResponse{}
+	responseList := make([]GetIsuListResponse, 0, len(isuList))
 
 	for _, isu := range isuList {
 		var formattedCondition *GetIsuConditionResponse
@@ -1042,6 +1044,13 @@ func getIsuGraph(c echo.Context) error {
 	}
 	date := time.Unix(datetimeInt64, 0).Truncate(time.Hour)
 
+	tx, err := db.Beginx()
+	if err != nil {
+		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	defer tx.Rollback()
+
 	//var count int
 	//err = tx.Get(&count, "SELECT COUNT(*) FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 	//	jiaUserID, jiaIsuUUID)
@@ -1054,9 +1063,15 @@ func getIsuGraph(c echo.Context) error {
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
-	res, err := generateIsuGraphResponse(db, jiaIsuUUID, date)
+	res, err := generateIsuGraphResponse(tx, jiaIsuUUID, date)
 	if err != nil {
 		c.Logger().Error(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -1134,15 +1149,15 @@ type graphConditionRow struct {
 	LevelInt      int
 }
 
-func generateIsuGraphResponse(db *sqlx.DB, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
-	dataPoints := []GraphDataPointWithInfo{}
-	conditionsInThisHour := []graphConditionRow{}
-	timestampsInThisHour := []int64{}
+func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
+	dataPoints := make([]GraphDataPointWithInfo, 0, 24)
+	conditionsInThisHour := make([]graphConditionRow, 0, 16)
+	timestampsInThisHour := make([]int64, 0, 16)
 	var startTimeInThisHour time.Time
 
 	endTime := graphDate.Add(24 * time.Hour)
 
-	rows, err := db.Queryx(`
+	rows, err := tx.Queryx(`
   		SELECT
   			UNIX_TIMESTAMP(timestamp),
   			is_sitting,
@@ -1189,8 +1204,8 @@ func generateIsuGraphResponse(db *sqlx.DB, jiaIsuUUID string, graphDate time.Tim
 			}
 
 			startTimeInThisHour = truncatedConditionTime
-			conditionsInThisHour = []graphConditionRow{}
-			timestampsInThisHour = []int64{}
+			conditionsInThisHour = make([]graphConditionRow, 0, 16)
+			timestampsInThisHour = make([]int64, 0, 16)
 		}
 
 		conditionsInThisHour = append(conditionsInThisHour, condition)
@@ -1214,13 +1229,13 @@ func generateIsuGraphResponse(db *sqlx.DB, jiaIsuUUID string, graphDate time.Tim
 		})
 	}
 
-	responseList := []GraphResponse{}
+	responseList := make([]GraphResponse, 0, 24)
 	index := 0
 	thisTime := graphDate
 
 	for thisTime.Before(graphDate.Add(time.Hour * 24)) {
 		var data *GraphDataPoint
-		timestamps := []int64{}
+		timestamps := emptyInt64Slice
 
 		if index < len(dataPoints) {
 			dataWithInfo := dataPoints[index]
@@ -1379,7 +1394,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 
 	var err error
 
-	conditionLevels := []int{}
+	conditionLevels := make([]int, 0, 3)
 	for level := range conditionLevel {
 		switch level {
 		case "info":
@@ -1425,7 +1440,7 @@ func getIsuConditionsFromDB(db *sqlx.DB, jiaIsuUUID string, endTime time.Time, c
 	}
 	defer rows.Close()
 
-	conditionsResponse := []*GetIsuConditionResponse{}
+	conditionsResponse := make([]*GetIsuConditionResponse, 0, limit)
 	for rows.Next() {
 		data := GetIsuConditionResponse{
 			IsuName: isuName,
@@ -1614,7 +1629,7 @@ func getTrend(c echo.Context) error {
 
 	cacheVersion := getTrendCacheVersion()
 
-	res := []TrendResponse{}
+	res := make([]TrendResponse, 0, 16)
 
 	type TrendRow struct {
 		ID            int
@@ -1623,7 +1638,7 @@ func getTrend(c echo.Context) error {
 		LevelInt      sql.NullInt64
 	}
 
-	var trendRows []TrendRow
+	trendRows := make([]TrendRow, 0, 1024)
 	rows, err := db.Queryx("SELECT i.id, i.character, UNIX_TIMESTAMP(l.timestamp), l.level_int FROM isu i" +
 		" LEFT JOIN latest_isu_condition l" +
 		" ON l.jia_isu_uuid = i.jia_isu_uuid" +
@@ -1652,9 +1667,9 @@ func getTrend(c echo.Context) error {
 		if !ok {
 			tr = &TrendResponse{
 				Character: trendRow.Character,
-				Info:      []*TrendCondition{},
-				Warning:   []*TrendCondition{},
-				Critical:  []*TrendCondition{},
+				Info:      make([]*TrendCondition, 0, 4),
+				Warning:   make([]*TrendCondition, 0, 4),
+				Critical:  make([]*TrendCondition, 0, 4),
 			}
 			byCharacter[trendRow.Character] = tr
 		}
@@ -1736,7 +1751,7 @@ func postIsuCondition(c echo.Context) error {
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
-	var rows []IsuCondition
+	rows := make([]IsuCondition, 0, len(req))
 	var latest *IsuCondition
 
 	for _, cond := range req {

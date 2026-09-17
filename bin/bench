@@ -1,2 +1,10 @@
+#!/bin/bash
+set -e
+
 cd /home/isucon/bench
-./bench -all-addresses 127.0.0.11 -target 127.0.0.11:443 -tls -jia-service-url http://127.0.0.1:4999
+
+BENCH_TARGET_ADDR=${BENCH_TARGET_ADDR:-127.0.0.11}
+BENCH_TARGET_HOST=${BENCH_TARGET_HOST:-isucondition.t.isucon.dev}
+JIA_SERVICE_URL=${JIA_SERVICE_URL:-http://127.0.0.1:4999}
+
+./bench -all-addresses "$BENCH_TARGET_ADDR" -target "$BENCH_TARGET_HOST:443" -tls -jia-service-url "$JIA_SERVICE_URL"

@@ -43,7 +43,7 @@ export MYSQL_PORT=3306
 export MYSQL_USER=isucon
 export MYSQL_PASS=isucon
 export MYSQL_DBNAME=isucondition
-export POST_ISUCONDITION_TARGET_BASE_URL=https://<APP_VM_PUBLIC_HOST_OR_IP>
+export POST_ISUCONDITION_TARGET_BASE_URL=https://isucondition.t.isucon.dev
 APP_ROLE=app ./bin/run.sh
 ```
 
@@ -56,7 +56,7 @@ export MYSQL_PORT=3306
 export MYSQL_USER=isucon
 export MYSQL_PASS=isucon
 export MYSQL_DBNAME=isucondition
-export POST_ISUCONDITION_TARGET_BASE_URL=https://<APP_VM_PUBLIC_HOST_OR_IP>
+export POST_ISUCONDITION_TARGET_BASE_URL=https://isucondition.t.isucon.dev
 EOF
 
 . ./env.sh
@@ -64,3 +64,21 @@ APP_ROLE=app ./bin/run.sh
 ```
 
 実IPやcredentialが入った `env.sh` はコミットしない。
+
+### Benchmark
+
+TLS証明書は `*.t.isucon.dev` 用なので、ベンチの `-target` にIPアドレスを直接指定すると証明書検証で失敗する。接続先IPは `-all-addresses` に渡し、`-target` は `isucondition.t.isucon.dev:443` のような証明書に合うホスト名にする。
+
+```bash
+cd /home/isucon/webapp
+BENCH_TARGET_ADDR=<APP_VM_PRIVATE_IP> ./bin/bench
+```
+
+必要ならホスト名やJIA URLも環境変数で上書きできる。
+
+```bash
+BENCH_TARGET_HOST=isucondition.t.isucon.dev \
+BENCH_TARGET_ADDR=<APP_VM_PRIVATE_IP> \
+JIA_SERVICE_URL=http://127.0.0.1:4999 \
+./bin/bench
+```

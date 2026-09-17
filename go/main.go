@@ -224,6 +224,7 @@ type IsuCondition struct {
 }
 
 type MySQLConnectionEnv struct {
+	Network  string
 	Host     string
 	Port     string
 	User     string
@@ -312,14 +313,21 @@ func getEnv(key string, defaultValue string) string {
 }
 
 func NewMySQLConnectionEnv() *MySQLConnectionEnv {
+	mysqlHost := os.Getenv("MYSQL_HOST")
+	if mysqlHost != "" {
+		return &MySQLConnectionEnv{
+			Network:  "tcp",
+			Host:     mysqlHost,
+			Port:     getEnv("MYSQL_PORT", "3306"),
+			User:     getEnv("MYSQL_USER", "isucon"),
+			DBName:   getEnv("MYSQL_DBNAME", "isucondition"),
+			Password: getEnv("MYSQL_PASS", "isucon"),
+		}
+	}
+
 	return &MySQLConnectionEnv{
-		//Host:     getEnv("MYSQL_HOST", "127.0.0.1"),
-		//Port:     getEnv("MYSQL_PORT", "3306"),
-		//User:     getEnv("MYSQL_USER", "isucon"),
-		//DBName:   getEnv("MYSQL_DBNAME", "isucondition"),
-		//Password: getEnv("MYSQL_PASS", "isucon"),
-		Host: "/run/mysqld/mysqld.sock",
-		//Port:     getEnv("MYSQL_PORT", "3306"),
+		Network:  "unix",
+		Host:     getEnv("MYSQL_SOCKET", "/run/mysqld/mysqld.sock"),
 		User:     getEnv("MYSQL_USER", "isucon"),
 		DBName:   getEnv("MYSQL_DBNAME", "isucondition"),
 		Password: getEnv("MYSQL_PASS", "isucon"),
@@ -327,8 +335,11 @@ func NewMySQLConnectionEnv() *MySQLConnectionEnv {
 }
 
 func (mc *MySQLConnectionEnv) ConnectDB() (*sqlx.DB, error) {
-	//dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Host, mc.Port, mc.DBName) // driverにてSQLパラメータの埋め込みを試してみる, logにPREPAREが非常に多いから (理解不十分)
-	dsn := fmt.Sprintf("%v:%v@unix(%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Host, mc.DBName) // driverにてSQLパラメータの埋め込みを試してみる, logにPREPAREが非常に多いから (理解不十分)
+	address := mc.Host
+	if mc.Network == "tcp" {
+		address = fmt.Sprintf("%v:%v", mc.Host, mc.Port)
+	}
+	dsn := fmt.Sprintf("%v:%v@%v(%v)/%v?parseTime=true&loc=Asia%%2FTokyo&interpolateParams=true", mc.User, mc.Password, mc.Network, address, mc.DBName)
 	return sqlx.Open("mysql", dsn)
 }
 
@@ -1901,4 +1912,3 @@ func isValidConditionFormat(conditionStr string) bool {
 func getIndex(c echo.Context) error {
 	return c.File(frontendContentsPath + "/index.html")
 }
-

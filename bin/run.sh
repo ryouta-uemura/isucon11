@@ -14,7 +14,13 @@ case "$APP_ROLE" in
 esac
 
 if [ "$APP_ROLE" = "all" ] || [ "$APP_ROLE" = "app" ]; then
-  sudo cp -r nginx/* /etc/nginx
+  sudo cp nginx/nginx.conf /etc/nginx/nginx.conf
+  sudo cp -r nginx/sites-available /etc/nginx/
+  sudo cp -r nginx/sites-enabled /etc/nginx/
+  sudo cp -r nginx/snippets /etc/nginx/
+  sudo cp nginx/*.params /etc/nginx/
+  sudo cp nginx/fastcgi.conf /etc/nginx/fastcgi.conf
+  sudo cp nginx/mime.types /etc/nginx/mime.types
 fi
 
 if [ "$APP_ROLE" = "all" ] || [ "$APP_ROLE" = "db" ]; then

@@ -40,6 +40,9 @@ fi
 
 if [ "$APP_ROLE" = "all" ] || [ "$APP_ROLE" = "db" ]; then
   sudo systemctl restart mysql
+  if [ -n "${MYSQL_APP_HOST:-}" ]; then
+    ./bin/grant_mysql_app.sh
+  fi
 fi
 
 if [ "$APP_ROLE" = "all" ] || [ "$APP_ROLE" = "app" ]; then

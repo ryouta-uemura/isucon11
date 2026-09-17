@@ -67,18 +67,22 @@ APP_ROLE=app ./bin/run.sh
 
 ### Benchmark
 
-TLS証明書は `*.t.isucon.dev` 用なので、ベンチの `-target` にIPアドレスを直接指定すると証明書検証で失敗する。接続先IPは `-all-addresses` に渡し、`-target` は `isucondition.t.isucon.dev:443` のような証明書に合うホスト名にする。
+ISUCON11のbenchは `-target` にIPアドレスを指定する。TLSのServerNameは `-all-addresses` の順番から以下のように内部で対応付けられる。
+
+- 1番目: `isucondition-1.t.isucon.dev`
+- 2番目: `isucondition-2.t.isucon.dev`
+- 3番目: `isucondition-3.t.isucon.dev`
 
 ```bash
 cd /home/isucon/webapp
 BENCH_TARGET_ADDR=<APP_VM_PRIVATE_IP> ./bin/bench
 ```
 
-必要ならホスト名やJIA URLも環境変数で上書きできる。
+必要なら全VMのIPやJIA URLも環境変数で上書きできる。
 
 ```bash
-BENCH_TARGET_HOST=isucondition.t.isucon.dev \
 BENCH_TARGET_ADDR=<APP_VM_PRIVATE_IP> \
+BENCH_ALL_ADDRESSES=<APP_VM_PRIVATE_IP>,<DB_VM_PRIVATE_IP> \
 JIA_SERVICE_URL=http://127.0.0.1:4999 \
 ./bin/bench
 ```

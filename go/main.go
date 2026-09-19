@@ -972,25 +972,21 @@ func getIsuID(c echo.Context) error {
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
-	var res Isu
-	// 一件改善できなそうに見えるこのクエリーがやたら重たい, 画像かな
-	// schema側でINVISIBLEを付与してみた -> 時間は半分くらいに, あとは整合性エラーが出るのかと思ったが出なかった
-	// ここで要求されてるレスポンスはなんなんだ？どこかに定義されているのか？？
-	// このレスポンスの省略は, 合法なのか？
-	err = db.QueryRowx(
-		"SELECT id, jia_isu_uuid, name, `character` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-		jiaUserID, jiaIsuUUID,
-	).Scan(&res.ID, &res.JIAIsuUUID, &res.Name, &res.Character)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return c.String(http.StatusNotFound, "not found: isu")
-		}
-
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+	// getIsuID: DB を引かず in-memory cache から返す。
+	// レスポンスに出るのは id / jia_isu_uuid / name / character の4つだけ（他は json:"-"）で、
+	// これは isuMeta キャッシュが保持している値と完全に一致する。
+	// 認可（jia_user_id の一致）も getAuthorizedIsuMeta が見ているので元のクエリと等価。
+	meta, ok := getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID)
+	if !ok {
+		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, Isu{
+		ID:         meta.ID,
+		JIAIsuUUID: meta.JIAIsuUUID,
+		Name:       meta.Name,
+		Character:  meta.Character,
+	})
 }
 
 // GET /api/isu/:jia_isu_uuid/icon

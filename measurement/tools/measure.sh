@@ -3,14 +3,23 @@
 #
 #   ./tools/measure.sh <label>
 #
-# アプリVM/ベンチVMは下の定数で固定。構成を変えたらここを直す。
+# 構成は環境変数で上書きできる。ベンチをアプリVMに同居させる場合は
+# BENCH_VM=<アプリVM名> BENCH_DIR=/home/isucon/bench BENCH_USER=isucon を指定する。
+#
+#   例) ベンチ別VM  : ./tools/measure.sh label
+#   例) ベンチ同居  : BENCH_VM=isucon11q BENCH_DIR=/home/isucon/bench \
+#                     BENCH_USER=isucon JIA_IP=127.0.0.1 TARGET_IP=127.0.0.11 \
+#                     ./tools/measure.sh label
 set -euo pipefail
 
-APP_VM=isucon11q
-BENCH_VM=isucon11q-bench
-APP_IP=192.168.252.9
-BENCH_IP=192.168.252.10
-WINDOW=45          # CPU を測る窓(秒)。LOAD が始まってから測る
+APP_VM="${APP_VM:-isucon11q}"
+BENCH_VM="${BENCH_VM:-isucon11q-bench}"
+BENCH_DIR="${BENCH_DIR:-/home/ubuntu/bench}"
+BENCH_USER="${BENCH_USER:-}"          # 空ならそのまま実行、値があれば sudo -u で実行
+TARGET_IP="${TARGET_IP:-192.168.252.9}"
+JIA_IP="${JIA_IP:-192.168.252.10}"
+TLS_OPTS="${TLS_OPTS:--tls -tls-skip-verify}"
+WINDOW="${WINDOW:-45}"   # CPU を測る窓(秒)。LOAD が始まってから測る
 LABEL="${1:-run}"
 
 # /proc/<pid>/stat の utime+stime をコマンド名で合算する
@@ -23,10 +32,15 @@ multipass exec "$APP_VM" -- sudo truncate -s 0 /var/log/nginx/access.log
 
 # ベンチVMは素のUbuntuなので nofile が 1024 のまま。上げないと
 # "too many open files" で panic する（アプリVMは ansible の nofile.yml で緩和済み）。
-multipass exec "$BENCH_VM" -- bash -c "ulimit -n 1048576; cd /home/ubuntu/bench && ./bench \
-  -all-addresses $APP_IP -target $APP_IP:443 -tls -tls-skip-verify \
-  -jia-service-url http://$BENCH_IP:5000 -score-dump /tmp/score.jsonl \
-  2>/dev/null > /tmp/measure.log" &
+BENCH_CMD="ulimit -n 1048576; cd $BENCH_DIR && ./bench \
+  -all-addresses $TARGET_IP -target $TARGET_IP:443 $TLS_OPTS \
+  -jia-service-url http://$JIA_IP:5000 -score-dump /tmp/score.jsonl \
+  2>/dev/null > /tmp/measure.log"
+if [ -n "$BENCH_USER" ]; then
+  multipass exec "$BENCH_VM" -- sudo -u "$BENCH_USER" bash -c "$BENCH_CMD" &
+else
+  multipass exec "$BENCH_VM" -- bash -c "$BENCH_CMD" &
+fi
 BPID=$!
 
 sleep 10   # PREPARE を避ける

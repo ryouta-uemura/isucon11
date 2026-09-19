@@ -21,7 +21,12 @@ DEST="$ROOT/runs/$(date +%Y%m%d-%H%M%S)-$LABEL"
 mkdir -p "$DEST"
 
 echo "==> fetching /var/log/nginx/access.log from $VM"
-multipass transfer "$VM:/var/log/nginx/access.log" "$DEST/access.log"
+# access.log は www-data:adm 0640 なので、転送を実行する ubuntu ユーザーからは
+# 読めないことがある。一度 sudo で読めるコピーを作ってから転送する。
+multipass exec "$VM" -- sudo bash -c \
+  'cp /var/log/nginx/access.log /tmp/access.log.fetch && chmod 644 /tmp/access.log.fetch'
+multipass transfer "$VM:/tmp/access.log.fetch" "$DEST/access.log"
+multipass exec "$VM" -- sudo rm -f /tmp/access.log.fetch
 
 # ベンチを -score-dump 付きで回していればスコアの時系列も回収する（無ければ飛ばす）
 ARGS=("$DEST/access.log")

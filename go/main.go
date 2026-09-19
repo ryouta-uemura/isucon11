@@ -77,6 +77,11 @@ var (
 	isuMetaMu     sync.RWMutex
 	isuMetaByUUID map[string]IsuMeta
 
+	// 各 ISU の最新コンディション。GET /api/isu を DB なしで返すために持つ。
+	// 更新規則は DB 側の `WHERE timestamp < ?` と同じ（新しい時だけ上書き）。
+	latestCondMu     sync.RWMutex
+	latestCondByUUID map[string]LatestCond
+
 	sessionUserCache sync.Map // session cookie string -> jia_user_id
 	// skipping the cryptographic calculations
 
@@ -89,6 +94,82 @@ type IsuMeta struct {
 	Name       string
 	Character  string
 	JIAUserID  string `db:"jia_user_id"`
+}
+
+type LatestCond struct {
+	TimestampUnix int64
+	IsSitting     bool
+	ConditionBits int
+	LevelInt      int
+	Message       string
+}
+
+// /initialize 後に DB から読み直す。初期データにもコンディションがあるので必須。
+// 空のまま返すとベンチが「LatestIsuCondition が nil」で不整合とみなす。
+func loadLatestCondCache() error {
+	rows, err := db.Queryx(
+		"SELECT jia_isu_uuid, UNIX_TIMESTAMP(timestamp), is_sitting, `condition_bits`, level_int, message" +
+			" FROM latest_isu_condition")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	next := map[string]LatestCond{}
+	for rows.Next() {
+		var uuid string
+		var lc LatestCond
+		if err := rows.Scan(&uuid, &lc.TimestampUnix, &lc.IsSitting, &lc.ConditionBits, &lc.LevelInt, &lc.Message); err != nil {
+			return err
+		}
+		next[uuid] = lc
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	latestCondMu.Lock()
+	latestCondByUUID = next
+	latestCondMu.Unlock()
+	return nil
+}
+
+// DB へのコミットが成功した後にだけ呼ぶこと。
+// 先に呼ぶと、POST が失敗した(=ベンチが成功と見なしていない)コンディションを
+// 返してしまい「POSTに成功していない時刻のデータが返されました」になる。
+func updateLatestCond(jiaIsuUUID string, lc LatestCond) {
+	latestCondMu.Lock()
+	defer latestCondMu.Unlock()
+
+	if latestCondByUUID == nil {
+		latestCondByUUID = map[string]LatestCond{}
+	}
+	if cur, ok := latestCondByUUID[jiaIsuUUID]; ok && cur.TimestampUnix >= lc.TimestampUnix {
+		return
+	}
+	latestCondByUUID[jiaIsuUUID] = lc
+}
+
+func getLatestCond(jiaIsuUUID string) (LatestCond, bool) {
+	latestCondMu.RLock()
+	defer latestCondMu.RUnlock()
+
+	lc, ok := latestCondByUUID[jiaIsuUUID]
+	return lc, ok
+}
+
+func listIsuMetaByUser(jiaUserID string) []IsuMeta {
+	isuMetaMu.RLock()
+	metas := make([]IsuMeta, 0, 16)
+	for _, m := range isuMetaByUUID {
+		if m.JIAUserID == jiaUserID {
+			metas = append(metas, m)
+		}
+	}
+	isuMetaMu.RUnlock()
+
+	sort.Slice(metas, func(i, j int) bool { return metas[i].ID > metas[j].ID }) // ORDER BY i.id DESC
+	return metas
 }
 
 func loadIsuMetaCache() error {
@@ -599,6 +680,11 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	if err := loadLatestCondCache(); err != nil {
+		c.Logger().Errorf("failed to load latest condition cache: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
 	invalidateTrendCache()
 	clearGraphCache()
 	return c.JSON(http.StatusOK, InitializeResponse{
@@ -722,83 +808,31 @@ func getIsuList(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	type IsuListRow struct {
-		ID                  int
-		JIAIsuUUID          string
-		Name                string
-		Character           string
-		LatestTimestampUnix sql.NullInt64
-		LatestIsSitting     sql.NullBool
-		LatestConditionBits sql.NullInt64
-		LatestLevelInt      sql.NullInt64
-		LatestMessage       sql.NullString
-	}
-	isuList := make([]IsuListRow, 0, 64)
-	rows, err := db.Queryx(
-		"SELECT i.id, i.jia_isu_uuid, i.name, i.`character`, "+
-			" UNIX_TIMESTAMP(l.timestamp),"+
-			" l.is_sitting,"+
-			" l.`condition_bits`,"+
-			" l.level_int,"+
-			" l.message"+
-			" FROM `isu` i "+
-			" LEFT JOIN latest_isu_condition l"+
-			" ON l.jia_isu_uuid = i.jia_isu_uuid"+
-			" WHERE i.jia_user_id = ?"+
-			" ORDER BY i.id DESC",
-		jiaUserID)
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var isu IsuListRow
-		if err := rows.Scan(
-			&isu.ID,
-			&isu.JIAIsuUUID,
-			&isu.Name,
-			&isu.Character,
-			&isu.LatestTimestampUnix,
-			&isu.LatestIsSitting,
-			&isu.LatestConditionBits,
-			&isu.LatestLevelInt,
-			&isu.LatestMessage,
-		); err != nil {
-			c.Logger().Errorf("db error: %v", err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
-		isuList = append(isuList, isu)
-	}
-	if err := rows.Err(); err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
-	responseList := make([]GetIsuListResponse, 0, len(isuList))
-
-	for _, isu := range isuList {
+	// isu の情報は isuMeta、最新コンディションは latestCond に載っているので DB を引かない。
+	// 元のクエリは isu LEFT JOIN latest_isu_condition ... ORDER BY i.id DESC。
+	metas := listIsuMetaByUser(jiaUserID)
+	responseList := make([]GetIsuListResponse, 0, len(metas))
+	for _, m := range metas {
 		var formattedCondition *GetIsuConditionResponse
-		if isu.LatestTimestampUnix.Valid {
+		if lc, ok := getLatestCond(m.JIAIsuUUID); ok {
 			formattedCondition = &GetIsuConditionResponse{
-				JIAIsuUUID:     isu.JIAIsuUUID,
-				IsuName:        isu.Name,
-				Timestamp:      isu.LatestTimestampUnix.Int64,
-				IsSitting:      isu.LatestIsSitting.Bool,
-				Condition:      conditionStringFromBits(int(isu.LatestConditionBits.Int64)),
-				ConditionLevel: levelStringFromInt(int(isu.LatestLevelInt.Int64)),
-				Message:        isu.LatestMessage.String,
+				JIAIsuUUID:     m.JIAIsuUUID,
+				IsuName:        m.Name,
+				Timestamp:      lc.TimestampUnix,
+				IsSitting:      lc.IsSitting,
+				Condition:      conditionStringFromBits(lc.ConditionBits),
+				ConditionLevel: levelStringFromInt(lc.LevelInt),
+				Message:        lc.Message,
 			}
 		}
 
-		res := GetIsuListResponse{
-			ID:                 isu.ID,
-			JIAIsuUUID:         isu.JIAIsuUUID,
-			Name:               isu.Name,
-			Character:          isu.Character,
-			LatestIsuCondition: formattedCondition}
-		responseList = append(responseList, res)
+		responseList = append(responseList, GetIsuListResponse{
+			ID:                 m.ID,
+			JIAIsuUUID:         m.JIAIsuUUID,
+			Name:               m.Name,
+			Character:          m.Character,
+			LatestIsuCondition: formattedCondition,
+		})
 	}
 
 	return c.JSON(http.StatusOK, responseList)
@@ -1924,6 +1958,16 @@ func postIsuCondition(c echo.Context) error {
 	// if err != nil && affected > 0 { // 実はこれでスコアが伸びてしまったのだが、これは重大な誤り, errがある場合はcache更新すべきタイミングではない(少なくともアプリの論理的には)
 	if err != nil && !latestChanged { // あえて全然更新しないロジックへ
 		invalidateTrendCache()
+	}
+	// コミット成功後にだけ反映する
+	if latest != nil {
+		updateLatestCond(jiaIsuUUID, LatestCond{
+			TimestampUnix: latest.Timestamp.Unix(),
+			IsSitting:     latest.IsSitting,
+			ConditionBits: latest.ConditionBits,
+			LevelInt:      latest.LevelInt,
+			Message:       latest.Message,
+		})
 	}
 	return c.NoContent(http.StatusAccepted)
 }

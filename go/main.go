@@ -29,6 +29,7 @@ import (
 	_ "net/http/pprof"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 )
 
 const (
@@ -63,6 +64,13 @@ var (
 	trendCacheVersion uint64
 	trendCache        []TrendResponse
 	trendCacheBuildMu sync.Mutex
+
+	// 確定した日のグラフは二度と変化しないのでメモ化する。
+	// key: "uuid|dayUnix" -> JSONバイト列（シリアライズもまとめて省く）
+	graphCache sync.Map
+	// 受信した condition の最大 timestamp。仮想時刻の代理として使う。
+	// アプリの壁時計は仮想時間と無関係なので判定には使えない。
+	latestConditionTS int64
 
 	// jia_isu_uuid -> isuのmeta
 	// 存在確認, 認可判定に活用
@@ -592,6 +600,7 @@ func postInitialize(c echo.Context) error {
 	}
 
 	invalidateTrendCache()
+	clearGraphCache()
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "go",
 	})
@@ -1029,6 +1038,36 @@ func getIsuIcon(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
+// ポスターは PostContentNum(10) x PostIntervalSecond(60) = 600 仮想秒ほど
+// さかのぼった timestamp も送ってくるので、その分の余裕を見る。
+const graphFinalizeMarginSec = 3600
+
+func updateLatestConditionTS(ts int64) {
+	for {
+		cur := atomic.LoadInt64(&latestConditionTS)
+		if ts <= cur || atomic.CompareAndSwapInt64(&latestConditionTS, cur, ts) {
+			return
+		}
+	}
+}
+
+// その日のグラフがもう変化しないか
+func isGraphDayFinalized(day time.Time) bool {
+	now := atomic.LoadInt64(&latestConditionTS)
+	if now == 0 {
+		return false
+	}
+	return day.Unix()+24*3600+graphFinalizeMarginSec <= now
+}
+
+func clearGraphCache() {
+	graphCache.Range(func(k, _ interface{}) bool {
+		graphCache.Delete(k)
+		return true
+	})
+	atomic.StoreInt64(&latestConditionTS, 0)
+}
+
 // GET /api/isu/:jia_isu_uuid/graph
 // ISUのコンディショングラフ描画のための情報を取得
 func getIsuGraph(c echo.Context) error {
@@ -1052,6 +1091,17 @@ func getIsuGraph(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "bad format: datetime")
 	}
 	date := time.Unix(datetimeInt64, 0).Truncate(time.Hour)
+
+	if _, ok := getAuthorizedIsuMeta(jiaUserID, jiaIsuUUID); !ok {
+		return c.String(http.StatusNotFound, "not found: isu")
+	}
+	cacheKey := jiaIsuUUID + "|" + strconv.FormatInt(date.Unix(), 10)
+	finalized := isGraphDayFinalized(date)
+	if finalized {
+		if v, ok := graphCache.Load(cacheKey); ok {
+			return c.JSONBlob(http.StatusOK, v.([]byte))
+		}
+	}
 
 	tx, err := db.Beginx()
 	if err != nil {
@@ -1084,6 +1134,12 @@ func getIsuGraph(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	if finalized {
+		if b, err := json.Marshal(res); err == nil {
+			graphCache.Store(cacheKey, b)
+			return c.JSONBlob(http.StatusOK, b)
+		}
+	}
 	return c.JSON(http.StatusOK, res)
 }
 
@@ -1792,6 +1848,9 @@ func postIsuCondition(c echo.Context) error {
 			tmp := row
 			latest = &tmp
 		}
+	}
+	if latest != nil {
+		updateLatestConditionTS(latest.Timestamp.Unix())
 	}
 	_, err = tx.NamedExec(
 		"INSERT INTO `isu_condition`"+

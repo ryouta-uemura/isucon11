@@ -504,6 +504,24 @@ func main() {
 
 	e.POST("/api/condition/:jia_isu_uuid", postIsuCondition)
 
+	// 計測用。ベンチは叩かない。
+	// 接続プール待ちは SQL の実行時間にもアプリのログにも現れないので、
+	// ここを読む以外に観測する手段がない。WaitCount が増えていたら
+	// SetMaxOpenConns が足りていない。
+	e.GET("/debug/dbstats", func(c echo.Context) error {
+		s := db.Stats()
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"MaxOpenConnections": s.MaxOpenConnections,
+			"OpenConnections":    s.OpenConnections,
+			"InUse":              s.InUse,
+			"Idle":               s.Idle,
+			"WaitCount":          s.WaitCount,
+			"WaitDurationMs":     s.WaitDuration.Milliseconds(),
+			"MaxIdleClosed":      s.MaxIdleClosed,
+			"MaxLifetimeClosed":  s.MaxLifetimeClosed,
+		})
+	})
+
 	e.GET("/", getIndex)
 	e.GET("/isu/:jia_isu_uuid", getIndex)
 	e.GET("/isu/:jia_isu_uuid/condition", getIndex)

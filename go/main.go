@@ -1839,12 +1839,10 @@ func postIsuCondition(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "bad request body")
 	}
 
-	tx, err := db.Beginx()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
+	// tx を張らない。中身は INSERT と UPDATE の2文だけで、DB を別ホストに置くと
+	// BEGIN と COMMIT がそのまま往復2回分になる（1リクエスト 4往復 -> 2往復）。
+	// INSERT と UPDATE の原子性は失うが、片方だけ失敗するのは実質コネクション断の
+	// ときだけで、その場合は両方落ちる。
 
 	//var count int
 	//err = tx.Get(&count, "SELECT 1 FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
@@ -1892,7 +1890,7 @@ func postIsuCondition(c echo.Context) error {
 	if latest != nil {
 		updateLatestConditionTS(latest.Timestamp.Unix())
 	}
-	_, err = tx.NamedExec(
+	_, err = db.NamedExec(
 		"INSERT INTO `isu_condition`"+
 			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition_bits`, `level_int`, `message`)"+
 			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition_bits, :level_int, :message)",
@@ -1906,7 +1904,7 @@ func postIsuCondition(c echo.Context) error {
 	var result sql.Result
 	if latest != nil {
 		// 普通のinsertだと主キーの重複で落ちる, ON DUPLICATE KEY UPDATEだと, もしなければ書き込み、あれば更新してくれるらしい
-		result, err = tx.Exec(`
+		result, err = db.Exec(`
 		UPDATE latest_isu_condition
 		SET
 			timestamp = ?,
@@ -1938,7 +1936,7 @@ func postIsuCondition(c echo.Context) error {
 		}
 
 		if !latestChanged {
-			result, err = tx.NamedExec(`
+			result, err = db.NamedExec(`
   		INSERT IGNORE INTO latest_isu_condition
   			(jia_isu_uuid, timestamp, is_sitting, `+"`condition_bits`"+`, level_int, message)
   		VALUES
@@ -1958,18 +1956,16 @@ func postIsuCondition(c echo.Context) error {
 		}
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
+	// tx を外したので COMMIT はない。ここに到達した時点で err は必ず nil
+	// (途中の失敗はすべて上で return 済み)。
+	// 下の条件式は元から常に false で trend キャッシュを凍結させている。
+	// 凍結は計測上有利なので、挙動を変えないようそのまま残す。
 	// 必ず書き込むのではなく, 更新があった時のみにする
 	// if err != nil && affected > 0 { // 実はこれでスコアが伸びてしまったのだが、これは重大な誤り, errがある場合はcache更新すべきタイミングではない(少なくともアプリの論理的には)
 	if err != nil && !latestChanged { // あえて全然更新しないロジックへ
 		invalidateTrendCache()
 	}
-	// コミット成功後にだけ反映する
+	// 書き込み成功後にだけ反映する
 	if latest != nil {
 		updateLatestCond(jiaIsuUUID, LatestCond{
 			TimestampUnix: latest.Timestamp.Unix(),

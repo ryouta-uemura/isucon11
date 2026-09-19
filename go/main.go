@@ -525,10 +525,14 @@ func main() {
 	// SQL 自体が 0.5ms のクエリでもエンドポイントが 4ms 台になっていた。
 	// 修正前: 1 走行で 40,224 接続 / 修正後: 21 接続。
 	//
-	// プールサイズ自体は 20 / 50 / 100 を試したが、スコア差は走行間の変動に埋もれた。
-	// 効くのは「MaxIdle >= MaxOpen」という関係の方。
-	db.SetMaxOpenConns(20)
-	db.SetMaxIdleConns(20)
+	// プールサイズ自体もスコアでは差が見えなかったが、それは測り方が悪かった。
+	// sql.DBStats を読むと 20 本では詰まっていることが直接わかる。
+	//   20本: WaitCount 10,206 / WaitDuration 50.4秒 (サーバ総時間の7.9%)
+	//   64本: WaitCount    143 / WaitDuration  0.29秒
+	// プール待ちは SQL の実行時間には現れず、アプリの待ち時間にだけ出るので
+	// slow log をいくら眺めても見つからない。DB 側は max_connections=151。
+	db.SetMaxOpenConns(64)
+	db.SetMaxIdleConns(64)
 	defer db.Close()
 
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")

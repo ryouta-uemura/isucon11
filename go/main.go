@@ -430,7 +430,16 @@ func main() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	db.SetMaxOpenConns(20) // TODO:大きくした方がスコアが高くなりやすそう, あとでこれの意義と最適なものを探る, 負荷状況、ボトルネックの場所によって最適な値が変わる
+	// SetMaxIdleConns の既定値は 2。MaxOpenConns より小さいと、クエリ完了時に
+	// アイドル上限を超えた接続が破棄され、次のクエリで再接続コストを払う。
+	// DB が別ホストだと 1 接続あたり TCP handshake + MySQL 認証で約 2ms かかり、
+	// SQL 自体が 0.5ms のクエリでもエンドポイントが 4ms 台になっていた。
+	// 修正前: 1 走行で 40,224 接続 / 修正後: 21 接続。
+	//
+	// プールサイズ自体は 20 / 50 / 100 を試したが、スコア差は走行間の変動に埋もれた。
+	// 効くのは「MaxIdle >= MaxOpen」という関係の方。
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(20)
 	defer db.Close()
 
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")

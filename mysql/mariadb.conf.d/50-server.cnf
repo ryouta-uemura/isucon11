@@ -9,11 +9,33 @@
 
 # this is only for the mysqld standalone daemon
 [mysqld]
-slow_query_log = 1
+# 計測するときだけ手で有効にすること。long_query_time = 0 の slow log は
+# 400万点水準ではそれ自体が重く、score が 3.94M -> 1.84M まで落ちる
+# (1走行で 2,557,549 行を書く)。既定は必ず OFF。
+#
+# 有効にしたあとはアプリも再起動すること。MariaDB の slow_query_log は
+# セッションスコープも持ち、既存の接続は古い値を保持する。SetMaxIdleConns で
+# プールの接続は走行を跨いで生き続けるので、SET GLOBAL しただけでは
+# アプリのクエリが1件も記録されない (init.sh の DDL だけが残る)。
+slow_query_log = 0
 slow_query_log_file = /var/log/mysql/slow.log
 long_query_time = 0.0
 
+# 増やしても効かない。Innodb_buffer_pool_reads = 0 で、23,865,474 回の
+# 論理読み込みに対して物理読み込みがゼロ。元からヒット率100%なので
+# 減らす余地がない。触る前にこの値を見ること。
 innodb_buffer_pool_size = 1G
+
+# redo log は固定サイズのリングバッファで、一周するときに未反映のページが
+# あると上書きできず、ユーザースレッドを止めてでも強制的にフラッシュする。
+# 1走行の redo は 434MB。48MB のままだと約9周し、7秒に1回これが起きていた。
+# 512MB なら一周もしない。
+innodb_log_file_size = 512M
+
+# torn page 対策にページを2回書く仕組み。1走行のページ書き込みが
+# 523MB -> 1046MB になる。ベンチは毎回 /initialize で作り直すので
+# 失うものがない。
+innodb_doublewrite = 0
 
 innodb_flush_log_at_trx_commit = 2 # 即時的にdisk書き込みをしなくなるらしい. ブチっと切れたら終わるけど、ISUCONではそれをケアする必要ない
 

@@ -886,12 +886,6 @@ func postIsu(c echo.Context) error {
 		}
 	}
 
-	// 失敗したら、そのファイル使われなくなるだろうし、この位置で書き込んじゃっていいかなぁ
-	if saveIsuIconToFile(jiaIsuUUID, jiaUserID, image); err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
 	tx, err := db.Beginx()
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
@@ -975,6 +969,22 @@ func postIsu(c echo.Context) error {
 	err = tx.Commit()
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	// アイコンのファイル書き込みは COMMIT 後に行う。
+	//
+	// 以前は tx を張る前に書いていたが、その後に早期 return が複数ある
+	// (isu の重複 409 / JIAService のエラー / DB エラー)。そこを通ると
+	// tx はロールバックされるのにファイルだけ残り、GET /api/isu/:uuid/icon が
+	// ファイルの存在だけで 200 を返してしまう。ベンチは ISU が存在しないので
+	// 404 を期待しており、ステータス不一致で減点されていた。
+	//
+	// tx の中に入れる必要はない。COMMIT 後なら tx を伸ばさずに済み、
+	// 「DB行はあるがファイルがまだない」窓はこのレスポンスを返す前に閉じるので
+	// クライアントからは観測できない。
+	if err := saveIsuIconToFile(jiaIsuUUID, jiaUserID, image); err != nil {
+		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 

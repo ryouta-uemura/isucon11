@@ -110,6 +110,140 @@ type LatestCond struct {
 
 // /initialize 後に DB から読み直す。初期データにもコンディションがあるので必須。
 // 空のまま返すとベンチが「LatestIsuCondition が nil」で不整合とみなす。
+// GET /api/condition/:uuid 用のインメモリ索引。
+//
+// クエリ結果のキャッシュは効かない（47,718件中ユニーク44,592件で、end_time を
+// ずらしながらページングするため平均1.07回しか再利用されない）。そこで結果ではなく
+// 「元データ」を持ち、毎回メモリ上を二分探索する。
+//
+// 規模: 1走行の終端で 760,655行 / 79 ISU、message は平均21バイト。
+// CondRow 1件あたり約40バイト + 文字列なので合計 60MB 程度で、4GB のVMに十分載る。
+type CondRow struct {
+	TimestampUnix int64
+	Message       string
+	ConditionBits int32
+	LevelInt      int8
+	IsSitting     bool
+}
+
+// ISU ごとに分ける。全体で1つのロックにすると POST と GET が同じ錠を奪い合う。
+type isuCondList struct {
+	mu   sync.RWMutex
+	rows []CondRow // TimestampUnix 昇順
+}
+
+var (
+	condStoreMu      sync.RWMutex
+	condStore        map[string]*isuCondList
+	condCacheEnabled = true // COND_CACHE=0 で DB 経路に戻せる（A/B 用）
+)
+
+func condListFor(jiaIsuUUID string) *isuCondList {
+	condStoreMu.RLock()
+	l := condStore[jiaIsuUUID]
+	condStoreMu.RUnlock()
+	if l != nil {
+		return l
+	}
+
+	condStoreMu.Lock()
+	defer condStoreMu.Unlock()
+	if condStore == nil {
+		condStore = map[string]*isuCondList{}
+	}
+	if l = condStore[jiaIsuUUID]; l == nil {
+		l = &isuCondList{rows: make([]CondRow, 0, 1024)}
+		condStore[jiaIsuUUID] = l
+	}
+	return l
+}
+
+// DB への書き込みが成功したあとにだけ呼ぶこと。
+// 先に入れると、POST が失敗した(=ベンチが成功と見なしていない)コンディションを
+// 返してしまう。latestCond と同じ理由。
+func appendConds(jiaIsuUUID string, rows []CondRow) {
+	l := condListFor(jiaIsuUUID)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, r := range rows {
+		n := len(l.rows)
+		// ポスターは時刻順に送ってくるので、ほぼ必ずこの追記で済む。
+		if n == 0 || l.rows[n-1].TimestampUnix <= r.TimestampUnix {
+			l.rows = append(l.rows, r)
+			continue
+		}
+		// まれに最大600仮想秒さかのぼった分が来る。末尾付近なので移動量は小さい。
+		i := sort.Search(n, func(i int) bool { return l.rows[i].TimestampUnix > r.TimestampUnix })
+		l.rows = append(l.rows, CondRow{})
+		copy(l.rows[i+1:], l.rows[i:])
+		l.rows[i] = r
+	}
+}
+
+// SQL と同じ意味にすること:
+//   timestamp < endTime / startTime <= timestamp / level_int IN (...) / DESC / LIMIT
+func queryConds(jiaIsuUUID string, endTime int64, startTime int64, hasStart bool,
+	levelMask uint8, limit int) []CondRow {
+
+	l := condListFor(jiaIsuUUID)
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	rows := l.rows
+	// timestamp < endTime なので endTime 以上になる最初の位置が上限(排他)
+	hi := sort.Search(len(rows), func(i int) bool { return rows[i].TimestampUnix >= endTime })
+	lo := 0
+	if hasStart {
+		// startTime <= timestamp
+		lo = sort.Search(len(rows), func(i int) bool { return rows[i].TimestampUnix >= startTime })
+	}
+
+	out := make([]CondRow, 0, limit)
+	for i := hi - 1; i >= lo && len(out) < limit; i-- {
+		if levelMask&(1<<uint8(rows[i].LevelInt)) != 0 {
+			out = append(out, rows[i])
+		}
+	}
+	return out
+}
+
+// /initialize 後に DB から読み直す。初期データは618行しかないので一瞬で終わる。
+func loadCondCache() error {
+	rows, err := db.Queryx(
+		"SELECT jia_isu_uuid, UNIX_TIMESTAMP(timestamp), is_sitting, `condition_bits`, level_int, message" +
+			" FROM `isu_condition` ORDER BY `jia_isu_uuid`, `timestamp`")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	next := map[string]*isuCondList{}
+	for rows.Next() {
+		var uuid string
+		var r CondRow
+		var bits, level int
+		if err := rows.Scan(&uuid, &r.TimestampUnix, &r.IsSitting, &bits, &level, &r.Message); err != nil {
+			return err
+		}
+		r.ConditionBits = int32(bits)
+		r.LevelInt = int8(level)
+		l := next[uuid]
+		if l == nil {
+			l = &isuCondList{rows: make([]CondRow, 0, 1024)}
+			next[uuid] = l
+		}
+		l.rows = append(l.rows, r)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	condStoreMu.Lock()
+	condStore = next
+	condStoreMu.Unlock()
+	return nil
+}
+
 func loadLatestCondCache() error {
 	rows, err := db.Queryx(
 		"SELECT jia_isu_uuid, UNIX_TIMESTAMP(timestamp), is_sitting, `condition_bits`, level_int, message" +
@@ -562,6 +696,11 @@ func main() {
 		}
 	}
 
+	// COND_CACHE=0 で GET /api/condition を DB 経路に戻す。A/B を同一バイナリで測るため。
+	if os.Getenv("COND_CACHE") == "0" {
+		condCacheEnabled = false
+	}
+
 	// プールサイズ自体もスコアでは差が見えなかったが、それは測り方が悪かった。
 	// sql.DBStats を読むと 20 本では詰まっていることが直接わかる。
 	//   20本: WaitCount 10,206 / WaitDuration 50.4秒 (サーバ総時間の7.9%)
@@ -723,6 +862,11 @@ func postInitialize(c echo.Context) error {
 
 	if err := loadLatestCondCache(); err != nil {
 		c.Logger().Errorf("failed to load latest condition cache: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	if err := loadCondCache(); err != nil {
+		c.Logger().Errorf("failed to load condition cache: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -1526,6 +1670,42 @@ func getIsuConditions(c echo.Context) error {
 		startTime = time.Unix(startTimeInt64, 0)
 	}
 
+	if condCacheEnabled {
+		var levelMask uint8
+		for level := range conditionLevel {
+			switch level {
+			case conditionLevelInfo:
+				levelMask |= 1 << 0
+			case conditionLevelWarning:
+				levelMask |= 1 << 1
+			case conditionLevelCritical:
+				levelMask |= 1 << 2
+			}
+		}
+
+		var startUnix int64
+		hasStart := !startTime.IsZero()
+		if hasStart {
+			startUnix = startTime.Unix()
+		}
+
+		found := queryConds(jiaIsuUUID, endTime.Unix(), startUnix, hasStart, levelMask, conditionLimit)
+		conditionsResponse := make([]*GetIsuConditionResponse, 0, len(found))
+		for i := range found {
+			r := &found[i]
+			conditionsResponse = append(conditionsResponse, &GetIsuConditionResponse{
+				JIAIsuUUID:     jiaIsuUUID,
+				IsuName:        isuName,
+				Timestamp:      r.TimestampUnix,
+				IsSitting:      r.IsSitting,
+				Condition:      conditionStringFromBits(int(r.ConditionBits)),
+				ConditionLevel: levelStringFromInt(int(r.LevelInt)),
+				Message:        r.Message,
+			})
+		}
+		return c.JSON(http.StatusOK, conditionsResponse)
+	}
+
 	conditionsResponse, err := getIsuConditionsFromDB(db, jiaIsuUUID, endTime, conditionLevel, startTime, conditionLimit, isuName)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
@@ -2007,6 +2187,19 @@ func postIsuCondition(c echo.Context) error {
 		invalidateTrendCache()
 	}
 	// 書き込み成功後にだけ反映する
+	if condCacheEnabled {
+		cached := make([]CondRow, 0, len(rows))
+		for _, r := range rows {
+			cached = append(cached, CondRow{
+				TimestampUnix: r.Timestamp.Unix(),
+				Message:       r.Message,
+				ConditionBits: int32(r.ConditionBits),
+				LevelInt:      int8(r.LevelInt),
+				IsSitting:     r.IsSitting,
+			})
+		}
+		appendConds(jiaIsuUUID, cached)
+	}
 	if latest != nil {
 		updateLatestCond(jiaIsuUUID, LatestCond{
 			TimestampUnix: latest.Timestamp.Unix(),

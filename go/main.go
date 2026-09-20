@@ -1328,13 +1328,6 @@ func getIsuGraph(c echo.Context) error {
 		}
 	}
 
-	tx, err := db.Beginx()
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-	defer tx.Rollback()
-
 	//var count int
 	//err = tx.Get(&count, "SELECT COUNT(*) FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 	//	jiaUserID, jiaIsuUUID)
@@ -1347,15 +1340,33 @@ func getIsuGraph(c echo.Context) error {
 		return c.String(http.StatusNotFound, "not found: isu")
 	}
 
-	res, err := generateIsuGraphResponse(tx, jiaIsuUUID, date)
-	if err != nil {
-		c.Logger().Error(err)
-		return c.NoContent(http.StatusInternalServerError)
+	// 索引経路では tx を張らない。元は1本の SELECT のためだけに
+	// BEGIN/COMMIT を往復させていた。
+	var conds []graphConditionRow
+	if condCacheEnabled {
+		conds = graphRowsFromCache(jiaIsuUUID, date)
+	} else {
+		tx, err := db.Beginx()
+		if err != nil {
+			c.Logger().Errorf("db error: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		defer tx.Rollback()
+
+		conds, err = graphRowsFromDB(tx, jiaIsuUUID, date)
+		if err != nil {
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		if err := tx.Commit(); err != nil {
+			c.Logger().Errorf("db error: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
 	}
 
-	err = tx.Commit()
+	res, err := generateIsuGraphResponse(jiaIsuUUID, date, conds)
 	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
+		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -1439,12 +1450,34 @@ type graphConditionRow struct {
 	LevelInt      int
 }
 
-func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
-	dataPoints := make([]GraphDataPointWithInfo, 0, 24)
-	conditionsInThisHour := make([]graphConditionRow, 0, 16)
-	timestampsInThisHour := make([]int64, 0, 16)
-	var startTimeInThisHour time.Time
+// 指定日のコンディションをインメモリ索引から昇順で取り出す。
+// 索引は timestamp 昇順なので、両端を二分探索するだけで範囲が取れる。
+func graphRowsFromCache(jiaIsuUUID string, graphDate time.Time) []graphConditionRow {
+	start := graphDate.Unix()
+	end := graphDate.Add(24 * time.Hour).Unix()
 
+	l := condListFor(jiaIsuUUID)
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	rows := l.rows
+	lo := sort.Search(len(rows), func(i int) bool { return rows[i].TimestampUnix >= start })
+	hi := sort.Search(len(rows), func(i int) bool { return rows[i].TimestampUnix >= end })
+
+	out := make([]graphConditionRow, 0, hi-lo)
+	for i := lo; i < hi; i++ {
+		out = append(out, graphConditionRow{
+			TimestampUnix: rows[i].TimestampUnix,
+			IsSitting:     rows[i].IsSitting,
+			ConditionBits: int(rows[i].ConditionBits),
+			LevelInt:      int(rows[i].LevelInt),
+		})
+	}
+	return out
+}
+
+// DB 経路（COND_CACHE=0 のときだけ使う）。
+func graphRowsFromDB(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]graphConditionRow, error) {
 	endTime := graphDate.Add(24 * time.Hour)
 
 	rows, err := tx.Queryx(`
@@ -1464,6 +1497,7 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 	}
 	defer rows.Close()
 
+	out := make([]graphConditionRow, 0, 1024)
 	for rows.Next() {
 		var condition graphConditionRow
 		if err := rows.Scan(
@@ -1474,7 +1508,22 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 		); err != nil {
 			return nil, err
 		}
+		out = append(out, condition)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
+// 取得元によらず、昇順のコンディション列からレスポンスを組み立てる。
+func generateIsuGraphResponse(jiaIsuUUID string, graphDate time.Time, conds []graphConditionRow) ([]GraphResponse, error) {
+	dataPoints := make([]GraphDataPointWithInfo, 0, 24)
+	conditionsInThisHour := make([]graphConditionRow, 0, 16)
+	timestampsInThisHour := make([]int64, 0, 16)
+	var startTimeInThisHour time.Time
+
+	for _, condition := range conds {
 		conditionTime := time.Unix(condition.TimestampUnix, 0)
 		truncatedConditionTime := conditionTime.Truncate(time.Hour)
 
@@ -1500,9 +1549,6 @@ func generateIsuGraphResponse(tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Tim
 
 		conditionsInThisHour = append(conditionsInThisHour, condition)
 		timestampsInThisHour = append(timestampsInThisHour, condition.TimestampUnix)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	if len(conditionsInThisHour) > 0 {

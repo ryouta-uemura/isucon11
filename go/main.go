@@ -64,6 +64,10 @@ var (
 	trendCacheVersion uint64
 	trendCache        []TrendResponse
 	trendCacheBuildMu sync.Mutex
+	// TREND_CACHE_TTL_MS で与える。0 なら期限なし(=凍結、従来の挙動)。
+	// 掃引のたびに再ビルドすると走行間に余計な変数が混ざるので環境変数にした。
+	trendCacheTTL     time.Duration
+	trendCacheBuiltAt time.Time
 
 	// 確定した日のグラフは二度と変化しないのでメモ化する。
 	// key: "uuid|dayUnix" -> JSONバイト列（シリアライズもまとめて省く）
@@ -247,6 +251,10 @@ func getTrendCache() ([]TrendResponse, uint64, bool) {
 	if trendCache == nil {
 		return nil, trendCacheVersion, false
 	}
+	// TTL=0 は期限なし(凍結)。従来の挙動。
+	if trendCacheTTL > 0 && time.Since(trendCacheBuiltAt) > trendCacheTTL {
+		return nil, trendCacheVersion, false
+	}
 	return trendCache, trendCacheVersion, true
 }
 
@@ -261,6 +269,7 @@ func setTrendCacheIfFresh(version uint64, res []TrendResponse) {
 	defer trendCacheMu.Unlock()
 	if version == trendCacheVersion {
 		trendCache = res
+		trendCacheBuiltAt = time.Now()
 	}
 }
 
@@ -543,6 +552,16 @@ func main() {
 	// SQL 自体が 0.5ms のクエリでもエンドポイントが 4ms 台になっていた。
 	// 修正前: 1 走行で 40,224 接続 / 修正後: 21 接続。
 	//
+	// trend キャッシュの寿命。0(既定)なら期限なし = 凍結で、従来どおりの挙動。
+	// ベンチは「viewer がまだ見ていない新しい condition」を trend で見た回数
+	// (viewUpdatedTrendCounter) が閾値を超えたときだけユーザーを増やすので、
+	// ここの鮮度がユーザー増加の蛇口になっている。掃引の結果は増加が赤字なので既定は0。
+	if v := os.Getenv("TREND_CACHE_TTL_MS"); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
+			trendCacheTTL = time.Duration(ms) * time.Millisecond
+		}
+	}
+
 	// プールサイズ自体もスコアでは差が見えなかったが、それは測り方が悪かった。
 	// sql.DBStats を読むと 20 本では詰まっていることが直接わかる。
 	//   20本: WaitCount 10,206 / WaitDuration 50.4秒 (サーバ総時間の7.9%)

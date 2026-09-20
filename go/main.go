@@ -860,6 +860,11 @@ func postInitialize(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
+	// グローバルの jiaURL は起動時に1度しか読んでいなかったため、DB を更新しても
+	// 反映されず、JIA の URL が変わると postIsu が 500 を返し続けていた
+	// （アプリの再起動が必要な状態だった）。ここで一緒に更新する。
+	jiaURL = request.JIAServiceURL
+
 	if err := loadIsuMetaCache(); err != nil {
 		c.Logger().Errorf("failed to load isu meta cache: %v", err)
 		return c.NoContent(http.StatusInternalServerError)

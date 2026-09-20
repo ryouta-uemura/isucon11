@@ -135,7 +135,8 @@ type isuCondList struct {
 var (
 	condStoreMu      sync.RWMutex
 	condStore        map[string]*isuCondList
-	condCacheEnabled = true // COND_CACHE=0 で DB 経路に戻せる（A/B 用）
+	condCacheEnabled  = true // COND_CACHE=0 で DB 経路に戻せる（A/B 用）
+	condInsertEnabled = true // COND_INSERT=0 で isu_condition への書き込みを止める
 )
 
 func condListFor(jiaIsuUUID string) *isuCondList {
@@ -699,6 +700,10 @@ func main() {
 	// COND_CACHE=0 で GET /api/condition を DB 経路に戻す。A/B を同一バイナリで測るため。
 	if os.Getenv("COND_CACHE") == "0" {
 		condCacheEnabled = false
+	}
+	// 索引を使わないのに書き込みも止めると、読むデータがどこにも無くなる。
+	if os.Getenv("COND_INSERT") == "0" && condCacheEnabled {
+		condInsertEnabled = false
 	}
 
 	// プールサイズ自体もスコアでは差が見えなかったが、それは測り方が悪かった。
@@ -2011,26 +2016,44 @@ func getTrend(c echo.Context) error {
 	}
 
 	trendRows := make([]TrendRow, 0, 1024)
-	rows, err := db.Queryx("SELECT i.id, i.character, UNIX_TIMESTAMP(l.timestamp), l.level_int FROM isu i" +
-		" LEFT JOIN latest_isu_condition l" +
-		" ON l.jia_isu_uuid = i.jia_isu_uuid" +
-		" ORDER BY i.character",
-	)
+	if condCacheEnabled {
+		// isuMeta と latestCond の組み合わせで作れるので DB を引かない。
+		// 元の LEFT JOIN と同じく、コンディションが無い ISU も含める（Valid=false）。
+		// latestCond は ISU ごとに単調増加（updateLatestCond が古い値を弾く）ので、
+		// 再構築しても以前より古いタイムスタンプが出ることはない。
+		// ここが逆転すると viewer は ViewerDropCount=1 で即脱落する。
+		isuMetaMu.RLock()
+		for _, m := range isuMetaByUUID {
+			row := TrendRow{ID: m.ID, Character: m.Character}
+			if lc, ok := getLatestCond(m.JIAIsuUUID); ok {
+				row.TimestampUnix = sql.NullInt64{Int64: lc.TimestampUnix, Valid: true}
+				row.LevelInt = sql.NullInt64{Int64: int64(lc.LevelInt), Valid: true}
+			}
+			trendRows = append(trendRows, row)
+		}
+		isuMetaMu.RUnlock()
+	} else {
+		rows, err := db.Queryx("SELECT i.id, i.character, UNIX_TIMESTAMP(l.timestamp), l.level_int FROM isu i" +
+			" LEFT JOIN latest_isu_condition l" +
+			" ON l.jia_isu_uuid = i.jia_isu_uuid" +
+			" ORDER BY i.character",
+		)
 
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var row TrendRow
-		if err := rows.Scan(&row.ID, &row.Character, &row.TimestampUnix, &row.LevelInt); err != nil {
+		if err != nil {
 			return err
 		}
-		trendRows = append(trendRows, row)
-	}
-	if err := rows.Err(); err != nil {
-		return err
+		defer rows.Close()
+
+		for rows.Next() {
+			var row TrendRow
+			if err := rows.Scan(&row.ID, &row.Character, &row.TimestampUnix, &row.LevelInt); err != nil {
+				return err
+			}
+			trendRows = append(trendRows, row)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
 	}
 
 	byCharacter := map[string]*TrendResponse{}
@@ -2157,19 +2180,29 @@ func postIsuCondition(c echo.Context) error {
 	if latest != nil {
 		updateLatestConditionTS(latest.Timestamp.Unix())
 	}
-	_, err = db.NamedExec(
-		"INSERT INTO `isu_condition`"+
-			"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition_bits`, `level_int`, `message`)"+
-			"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition_bits, :level_int, :message)",
-		rows)
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
+	// COND_INSERT=0 で isu_condition への書き込みを止める。
+	// 索引経路では isu_condition を読むのは /initialize の初期ロードだけなので、
+	// このテーブルは書き込み専用になっており、書かなくても誰も困らない。
+	// 引き換えにアプリのメモリが唯一の正本になる（走行中に落ちたら復旧不能）。
+	if condInsertEnabled {
+		_, err = db.NamedExec(
+			"INSERT INTO `isu_condition`"+
+				"	(`jia_isu_uuid`, `timestamp`, `is_sitting`, `condition_bits`, `level_int`, `message`)"+
+				"	VALUES (:jia_isu_uuid, :timestamp, :is_sitting, :condition_bits, :level_int, :message)",
+			rows)
+		if err != nil {
+			c.Logger().Errorf("db error: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
 	}
 
 	latestChanged := false
 	var result sql.Result
-	if latest != nil {
+	// latest_isu_condition を読むのは getTrend の LEFT JOIN だけで、それも
+	// 索引経路ではメモリから組み立てるようになった。つまりこのテーブルも
+	// 書き込み専用なので、COND_INSERT=0 のときは一緒に書くのをやめる。
+	// 元は 75,113回書いて1走行あたり約10回しか読まれていなかった。
+	if latest != nil && condInsertEnabled {
 		// 普通のinsertだと主キーの重複で落ちる, ON DUPLICATE KEY UPDATEだと, もしなければ書き込み、あれば更新してくれるらしい
 		result, err = db.Exec(`
 		UPDATE latest_isu_condition

@@ -136,7 +136,8 @@ var (
 	condStoreMu      sync.RWMutex
 	condStore        map[string]*isuCondList
 	condCacheEnabled  = true // COND_CACHE=0 で DB 経路に戻せる（A/B 用）
-	condInsertEnabled = true // COND_INSERT=0 で isu_condition への書き込みを止める
+	condInsertEnabled = true  // COND_INSERT=0 で isu_condition への書き込みを止める
+	noNginx           = false // NO_NGINX=1 で nginx を外し Go が直接 TLS を終端する
 )
 
 func condListFor(jiaIsuUUID string) *isuCondList {
@@ -671,7 +672,21 @@ func main() {
 	e.GET("/isu/:jia_isu_uuid/condition", getIndex)
 	e.GET("/isu/:jia_isu_uuid/graph", getIndex)
 	e.GET("/register", getIndex)
-	e.Static("/assets", frontendContentsPath+"/assets")
+	// nginx が付けていたキャッシュヘッダをここで付ける。
+	// nginx を経路に置いている間は nginx 側が先に処理するので影響しない。
+	assets := e.Group("/assets", func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Response().Header().Set("Cache-Control", "public, immutable, max-age=31536000")
+			return next(c)
+		}
+	})
+	assets.Static("", frontendContentsPath+"/assets")
+
+	// nginx の `location = /favicon.ico { alias .../favicon.d0f5f504.svg; }` 相当。
+	e.GET("/favicon.ico", func(c echo.Context) error {
+		c.Response().Header().Set("Cache-Control", "public, immutable, max-age=31536000")
+		return c.File(frontendContentsPath + "/assets/favicon.d0f5f504.svg")
+	})
 
 	mySQLConnectionData = NewMySQLConnectionEnv()
 
@@ -705,6 +720,9 @@ func main() {
 	if os.Getenv("COND_INSERT") == "0" && condCacheEnabled {
 		condInsertEnabled = false
 	}
+	if os.Getenv("NO_NGINX") == "1" {
+		noNginx = true
+	}
 
 	// プールサイズ自体もスコアでは差が見えなかったが、それは測り方が悪かった。
 	// sql.DBStats を読むと 20 本では詰まっていることが直接わかる。
@@ -735,6 +753,42 @@ func main() {
 	go func() {
 		http.ListenAndServe(":6060", nil)
 	}()
+
+	// NO_NGINX=1 で nginx を経路から外し、Go が直接 TLS を終端する。
+	//
+	// nginx がやっていたことのうち、ここで背負うもの:
+	//   TLS 終端 / HTTP2（Go は TLS サーバなら自動で h2 を出す）
+	//   静的ファイル配信（上の assets グループと favicon）
+	//   SPA フォールバック（getIndex の各ルートは元からある）
+	//   アイコン配信（X-Accel-Redirect の代わりに自分で返す。getIsuIcon 参照）
+	//
+	// 必要な下準備が2つある。どちらも欠かすと原因のわかりにくい形で失敗する:
+	//
+	//   1) 443 への bind に capability が要る
+	//        sudo setcap 'cap_net_bind_service=+ep' /home/isucon/webapp/go/isucondition
+	//      ビルドし直すと消えるので、デプロイのたびに付け直すこと。
+	//
+	//   2) systemd の LimitNOFILE を上げること（既定のソフト上限は1024）
+	//        [Service]
+	//        LimitNOFILE=1048576
+	//      nginx 経由なら X-Accel-Redirect を返すだけでアプリはファイルを開かないが、
+	//      外すと静的ファイル 64,623件/走行を自分で配信し、c.File が毎回 os.Open する。
+	//      枯渇すると echo の NotFoundHandler に落ちるので、**FD枯渇が 404 として
+	//      観測される**。実際これで GET /api/isu/:uuid/icon が 102件 404 になり
+	//      失格した（全件が走行最後の1秒に集中するのが見分け方）。
+	//
+	// nginx に戻すときは順序に注意。アプリが 443 を握ったまま nginx を起動すると
+	// bind に失敗する。先にアプリを unix socket 側へ戻すこと。
+	if noNginx {
+		certFile := getEnv("TLS_CERT", "/etc/nginx/certificates/tls-cert.pem")
+		keyFile := getEnv("TLS_KEY", "/etc/nginx/certificates/tls-key.pem")
+		server := &http.Server{
+			Addr:    getEnv("SERVER_ADDR", ":443"),
+			Handler: e,
+		}
+		e.Logger.Fatal(server.ListenAndServeTLS(certFile, keyFile))
+		return
+	}
 
 	socketPath := "/tmp/isucondition.sock"
 	_ = os.Remove(socketPath)
@@ -1268,8 +1322,13 @@ func getIsuIcon(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	c.Response().Header().Set("X-Accel-Redirect", iconPath)                           // return from nginx
 	c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable") // add cache, since the icon image is not updated.
+	// nginx を外した構成では X-Accel-Redirect を受ける相手がいないので自分で返す。
+	// 認可はここまでで済んでおり、あとはファイルを流すだけ。
+	if noNginx {
+		return c.File(filePath)
+	}
+	c.Response().Header().Set("X-Accel-Redirect", iconPath) // return from nginx
 	return c.NoContent(http.StatusOK)
 }
 

@@ -37,6 +37,7 @@ multipass exec "$APP_VM" -- sudo truncate -s 0 /var/log/nginx/access.log
 BENCH_CMD="ulimit -n 1048576; cd $BENCH_DIR && ${BENCH_ENV:-} ./bench \
   -all-addresses $TARGET_IP -target $TARGET_IP:443 $TLS_OPTS \
   -jia-service-url http://$JIA_IP:5000 -score-dump /tmp/score.jsonl \
+  ${BENCH_PROFILE:+-profile $BENCH_PROFILE} \
   2>/dev/null > /tmp/measure.log"
 if [ -n "$BENCH_USER" ]; then
   multipass exec "$BENCH_VM" -- sudo -u "$BENCH_USER" bash -c "$BENCH_CMD" &
